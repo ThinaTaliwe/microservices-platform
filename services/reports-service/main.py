@@ -1,0 +1,126 @@
+import os, json, threading, time
+from fastapi import FastAPI
+import psycopg
+import pika
+
+app = FastAPI(title="reports-service")
+_seen_events = []  # keep last 50 in memory
+
+def db_conn():
+    return psycopg.connect(
+        host=os.getenv("DB_HOST", "reports-db"),
+        port=int(os.getenv("DB_PORT", "5432")),
+        dbname=os.getenv("DB_DATABASE", "reportsdb"),
+        user=os.getenv("DB_USERNAME", "reports"),
+        password=os.getenv("DB_PASSWORD", "reportspass"),
+    )
+
+def store_event(event: dict):
+    _seen_events.append(event)
+    if len(_seen_events) > 50:
+        del _seen_events[0:len(_seen_events)-50]
+
+def handle_order_created(event: dict):
+    with db_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO demo_reports (order_id, user_id, total, correlation_id, created_at)
+                VALUES (%s, %s, %s, %s, now())
+                ON CONFLICT (correlation_id) DO NOTHING;
+            """, (
+                int(event["order_id"]),
+                int(event["user_id"]),
+                float(event["total"]),
+                str(event.get("correlation_id", "")),
+            ))
+    store_event(event)
+
+def consumer_loop():
+    host = os.getenv("RABBITMQ_HOST", "rabbitmq")
+    port = int(os.getenv("RABBITMQ_PORT", "5672"))
+    user = os.getenv("RABBITMQ_USER", "admin")
+    password = os.getenv("RABBITMQ_PASSWORD", "admin12345")
+
+    qname = "reports.order.created"
+    exchange = "events"
+    routing_key = "order.created"
+
+    # IMPORTANT: queue args must match existing queue args in RabbitMQ
+    qargs = {"x-dead-letter-exchange": "reports.dlx", "x-dead-letter-routing-key": "order.created"}
+
+    while True:
+        try:
+            creds = pika.PlainCredentials(user, password)
+            params = pika.ConnectionParameters(
+                host=host,
+                port=port,
+                credentials=creds,
+                heartbeat=30,
+                blocked_connection_timeout=30,
+            )
+            conn = pika.BlockingConnection(params)
+            ch = conn.channel()
+
+            ch.exchange_declare(exchange=exchange, exchange_type="topic", durable=True)
+
+            ch.queue_declare(queue=qname, durable=True, arguments=qargs)
+            ch.queue_bind(exchange=exchange, queue=qname, routing_key=routing_key)
+
+            def on_message(ch, method, properties, body):
+                try:
+                    event = json.loads(body.decode("utf-8"))
+                    handle_order_created(event)
+                    ch.basic_ack(delivery_tag=method.delivery_tag)
+                except Exception as e:
+                    # For the demo: don't requeue forever; let DLX/retry patterns handle it later
+                    print(f"[consumer] failed: {e}", flush=True)
+                    ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+
+            ch.basic_qos(prefetch_count=10)
+            ch.basic_consume(queue=qname, on_message_callback=on_message)
+
+            print(f"[consumer] STARTED queue={qname} exchange={exchange} key={routing_key}", flush=True)
+            ch.start_consuming()
+
+        except Exception as e:
+            print(f"[consumer] ERROR: {e} (retrying in 3s)", flush=True)
+            time.sleep(3)
+
+@app.on_event("startup")
+def startup():
+    threading.Thread(target=consumer_loop, daemon=True).start()
+    print("[startup] consumer thread started", flush=True)
+
+@app.get("/health")
+def health():
+    return {"service": "reports-service", "status": "ok"}
+
+@app.get("/events")
+def events():
+    return {"count": len(_seen_events), "events": _seen_events[-20:]}
+
+@app.get("/reports")
+def reports():
+    with db_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, order_id, user_id, total, correlation_id, created_at
+                FROM demo_reports
+                ORDER BY id DESC
+                LIMIT 20;
+            """)
+            rows = cur.fetchall()
+
+    return {
+        "count": len(rows),
+        "reports": [
+            {
+                "id": r[0],
+                "order_id": r[1],
+                "user_id": r[2],
+                "total": float(r[3]),
+                "correlation_id": r[4],
+                "created_at": r[5].isoformat(),
+            } for r in rows
+        ],
+    }

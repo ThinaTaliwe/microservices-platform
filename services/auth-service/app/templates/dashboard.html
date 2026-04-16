@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Gateway Dashboard{% endblock %}
+
+{% block body_class %}dashboard-page{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="header">
+        <h1>🚀Dashboard</h1>
+        <div class="header-actions">
+            <button class="theme-toggle" id="theme-toggle" title="Toggle theme">🌙</button>
+            <a href="/logout" class="logout-btn">Logout</a>
+        </div>
+    </div>
+
+    {% if error %}
+    <div class="error-card">
+        <div class="error-icon">⚠️</div>
+        <h3>Unable to Access Docker</h3>
+        <p>{{ error }}</p>
+        <div class="error-details">
+            <strong>Troubleshooting:</strong>
+            <ul>
+                <li>Check if Docker daemon is running</li>
+                <li>Verify container permissions</li>
+                <li>Ensure Docker socket is mounted</li>
+            </ul>
+        </div>
+    </div>
+    {% else %}
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-number">{{ total_containers }}</div>
+            <div class="stat-label">Total Containers</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number running">{{ running_count }}</div>
+            <div class="stat-label">Running</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number stopped">{{ stopped_count }}</div>
+            <div class="stat-label">Stopped</div>
+        </div>
+    </div>
+
+    {% if running_containers %}
+    <div class="section">
+        <h3>🟢 Running Containers ({{ running_count }})</h3>
+        <div class="containers-grid">
+            {% for container in running_containers %}
+            <div class="container-card" data-status="{{ container.status }}">
+                <div class="card-header">
+                    <div class="container-name">{{ container.name }}</div>
+                    <div class="status-badge status-running">
+                        🟢 {{ container.status.title() }}
+                    </div>
+                </div>
+                <div class="card-content">
+                    <div class="image-info">📦 {{ container.image }}</div>
+                    {% if container.ports %}
+                    <div class="ports">📡 {{ container.ports|join(', ') }}</div>
+                    {% endif %}
+                    <div class="container-id">🆔 {{ container.id }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if stopped_containers %}
+    <div class="section">
+        <h3>🔴 Stopped Containers ({{ stopped_count }})</h3>
+        <div class="containers-grid">
+            {% for container in stopped_containers %}
+            <div class="container-card" data-status="{{ container.status }}">
+                <div class="card-header">
+                    <div class="container-name">{{ container.name }}</div>
+                    <div class="status-badge status-stopped">
+                        🔴 {{ container.status.title() }}
+                    </div>
+                </div>
+                <div class="card-content">
+                    <div class="image-info">📦 {{ container.image }}</div>
+                    {% if container.ports %}
+                    <div class="ports">📡 {{ container.ports|join(', ') }}</div>
+                    {% endif %}
+                    <div class="container-id">🆔 {{ container.id }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if other_containers %}
+    <div class="section">
+        <h3>⚪ Other Containers ({{ other_containers|length }})</h3>
+        <div class="containers-grid">
+            {% for container in other_containers %}
+            <div class="container-card" data-status="{{ container.status }}">
+                <div class="card-header">
+                    <div class="container-name">{{ container.name }}</div>
+                    <div class="status-badge status-other">
+                        ⚪ {{ container.status.title() }}
+                    </div>
+                </div>
+                <div class="card-content">
+                    <div class="image-info">📦 {{ container.image }}</div>
+                    {% if container.ports %}
+                    <div class="ports">📡 {{ container.ports|join(', ') }}</div>
+                    {% endif %}
+                    <div class="container-id">🆔 {{ container.id }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+</div>
+{% endblock %}

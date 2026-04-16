@@ -1,0 +1,24 @@
+# env & secrets
+.env
+.env.*
+*.key
+*.secret
+
+# docker volumes
+**/mysql_data/
+**/postgres_data/
+**/db_data/
+**/shared_mysql_data/
+**/users_mysql_data/
+
+# logs
+**/*.log
+**/logs/
+
+# python
+**/__pycache__/
+**/*.pyc
+
+# editor
+.vscode/
+.idea/

@@ -1,0 +1,16 @@
+FROM php:8.3-fpm
+
+# Force Debian repos to use HTTPS (avoids port 80 blocks)
+RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources \
+ && sed -i 's|http://security.debian.org|https://security.debian.org|g' /etc/apt/sources.list.d/debian.sources || true
+
+
+# System deps + PHP extensions needed by Laravel
+RUN apt-get update && apt-get install -y \
+    git unzip libzip-dev default-mysql-client \
+    && docker-php-ext-install pdo pdo_mysql \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+CMD ["sh", "-lc", "php -v && php -S 0.0.0.0:8000 -t public"]

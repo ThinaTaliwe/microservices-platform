@@ -1,0 +1,267 @@
+# version: '3'
+
+services:
+  gateway:
+    image: nginx:alpine
+    container_name: gateway
+    ports:
+      - "8080:80"
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - internal
+    depends_on:
+      - siya-app
+      - nkosi-app
+      - dumi-app
+      - hlayi-app
+      - bev-app
+      - phpmyadmin
+      - auth-service
+      - oauth2-proxy
+      - bfrn-nginx
+    restart: unless-stopped
+
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
+    container_name: oauth2-proxy
+    networks:
+      - internal
+    environment:
+      OAUTH2_PROXY_PROVIDER: "keycloak-oidc"
+      OAUTH2_PROXY_OIDC_ISSUER_URL: "http://192.168.1.9:8080/auth/realms/master"
+      OAUTH2_PROXY_REDIRECT_URL: "http://192.168.1.9:8080/oauth2/callback"
+      OAUTH2_PROXY_CLIENT_ID: "gateway"
+      OAUTH2_PROXY_CLIENT_SECRET: "CHANGE_ME_GATEWAY_CLIENT_SECRET"
+      OAUTH2_PROXY_COOKIE_SECRET: "1WIPAY_sRGGTE3RT_5TJGgqZUomOj3yVgyE5wnJ3vuw="  # base64-encoded 32-byte key
+      OAUTH2_PROXY_COOKIE_SECURE: "false"               # DEV over HTTP
+      OAUTH2_PROXY_COOKIE_SAMESITE: "lax"
+      OAUTH2_PROXY_COOKIE_REFRESH: "55m"
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+
+      # Make oauth2-proxy usable for Nginx auth_request:
+      OAUTH2_PROXY_HTTP_ADDRESS: "0.0.0.0:4180"
+      OAUTH2_PROXY_UPSTREAMS: "static://200"
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+      OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
+      OAUTH2_PROXY_PASS_AUTHORIZATION_HEADER: "true"
+      OAUTH2_PROXY_PASS_ACCESS_TOKEN: "true"
+      OAUTH2_PROXY_PASS_USER_HEADERS: "true"
+
+      # IMPORTANT for API clients sending Bearer tokens:
+      OAUTH2_PROXY_SKIP_JWT_BEARER_TOKENS: "true"
+
+      # Tell oauth2-proxy where to find roles/groups in token:
+      OAUTH2_PROXY_OIDC_GROUPS_CLAIM: "groups"
+
+      # DEV: allow all authenticated users; authorization will be done in Nginx per-path
+      # (Later you can also lock with allowed groups here if you want)
+    restart: unless-stopped
+
+  shared-mysql:
+    image: mysql:8.0
+    container_name: shared-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: RootStrong123!
+      MYSQL_DATABASE: microservices_shared
+    volumes:
+      - shared_mysql_data:/var/lib/mysql
+      - ./shared-mysql/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # phpMyAdmin Service
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: shared-mysql
+      PMA_PORT: 3306
+      PMA_ABSOLUTE_URI: "http://192.168.1.9:8080/phpmyadmin/"
+      UPLOAD_LIMIT: 1024M
+      MEMORY_LIMIT: 512M
+    depends_on:
+      shared-mysql:
+        condition: service_healthy
+    networks:
+      - internal
+    volumes:
+      - ./phpmyadmin/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini:ro
+
+  nkosi-app:
+    build: ./services/nkosi
+    container_name: nkosi-app
+    environment:
+      SERVICE_NAME: nkosi
+      MYSQL_HOST: shared-mysql
+      MYSQL_USER: nkosi
+      MYSQL_PASSWORD: NkosiPass123!
+      MYSQL_DATABASE: 1office_0_2
+    depends_on: 
+      shared-mysql:
+        condition: service_healthy
+    networks: [internal]
+
+  dumi-app:
+    build: ./services/dumi
+    container_name: dumi-app
+    environment:
+      SERVICE_NAME: dumi
+      MYSQL_HOST: shared-mysql
+      MYSQL_USER: dumi
+      MYSQL_PASSWORD: DumiPass123!
+      MYSQL_DATABASE: 1office_0_2
+    depends_on:
+      shared-mysql:
+        condition: service_healthy
+    networks: [internal]
+
+  hlayi-app:
+    build: ./services/hlayi
+    container_name: hlayi-app
+    environment:
+      SERVICE_NAME: hlayi
+      MYSQL_HOST: shared-mysql
+      MYSQL_USER: hlayi
+      MYSQL_PASSWORD: HlayiPass123!
+      MYSQL_DATABASE: 1office_0_2
+    depends_on:
+      shared-mysql:
+        condition: service_healthy
+    networks: [internal]
+
+  siya-app:
+    build: ./services/siya
+    container_name: siya-app
+    working_dir: /opt/microservices-platform/services/siya
+    volumes:
+      - ./services/siya:/opt/microservices-platform/services/siya
+      - /opt/data/shipment-docs:/data/shipment-docs
+    expose:
+      - "8000"
+    # (optional) keep this if you also want direct access on :8000 for debugging
+    # ports:
+    #   - "8000:8000"
+    command: ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "120"]
+    environment:
+      SERVICE_NAME: siya
+      MYSQL_HOST: shared-mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: siya
+      MYSQL_PASSWORD: SiyaPass123!
+      MYSQL_DATABASE: 1office_0_2
+    depends_on:
+      shared-mysql:
+        condition: service_healthy
+    networks: [internal]
+    restart: unless-stopped
+
+  auth-service:
+    build:
+      context: ./services/auth-service
+    environment:
+      AUTH_SECRET: "02b31f81f1d2da1082232ff9a9eee654ae6144901867e15ee15816fbb5739f44"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    privileged: true
+    networks:
+      - internal
+
+  bev-app:
+    build: ./services/bev
+    container_name: bev-app
+    environment:
+      SERVICE_NAME: bev
+      MYSQL_HOST: shared-mysql
+      MYSQL_USER: bev
+      MYSQL_PASSWORD: BevPass123!
+      MYSQL_DATABASE: 1office_0_2
+    depends_on:
+      shared-mysql:
+        condition: service_healthy
+    networks: [internal]
+
+  bfrn-php:
+    container_name: bfrn-php
+    build:
+      context: ./services/bfrn
+      dockerfile: docker/Dockerfile.fpm
+    working_dir: /app
+    volumes:
+      - ./services/bfrn:/app
+    environment:
+      APP_ENV: local
+      DB_CONNECTION: mysql
+      DB_HOST: shared-mysql
+      DB_PORT: 3306
+      DB_DATABASE: bfrn-app
+      DB_USERNAME: root
+      DB_PASSWORD: "RootStrong123!"
+      # We'll call Siya internally (recommended)
+      SIYA_API_BASE: "http://siya-app:8000"
+    networks:
+      - internal
+    depends_on:
+      shared-mysql:
+        condition: service_healthy
+
+  bfrn-nginx:
+    container_name: bfrn-nginx
+    image: nginx:alpine
+    volumes:
+      - ./services/bfrn:/app:ro
+      - ./services/bfrn/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - internal
+    depends_on:
+      - bfrn-php
+
+  db:
+    image: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: "db"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+    networks:
+      - internal
+
+  pship:
+    image: danh91.docker.scarf.sh/purplship/server:2021.11
+    restart: unless-stopped
+    environment:
+      - DEBUG_MODE=True
+      - ALLOWED_HOSTS=*
+      - ADMIN_EMAIL=admin@example.com
+      - ADMIN_PASSWORD=demo
+      - DATABASE_NAME=db
+      - DATABASE_HOST=db
+      - DATABASE_PORT=5432
+      - DATABASE_USERNAME=postgres
+      - DATABASE_PASSWORD=postgres
+    depends_on:
+      shared-mysql:
+        condition: service_healthy
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+    name: microservices-platform_internal
+
+volumes:
+  shared_mysql_data:
+  db_data:
+  siya_shipment_docs:
+
+# volumes:
+# networks:
+#   db_network:
+#     driver: bridge

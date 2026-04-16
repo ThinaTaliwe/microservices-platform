@@ -1,0 +1,16 @@
+Then restart gateway + start adminer:
+
+
+
+cd /opt/microservices-platform
+docker compose up -d adminer
+docker compose restart gateway
+
+Step 4.3 — Test
+curl -I http://192.168.1.9/db/ | head -n 5
+
+
+✅ Expected: HTTP/1.1 200 OK (or 302 then 200)
+
+nginx test: sudo docker compose exec gateway nginx -t
+

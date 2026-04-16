@@ -1,0 +1,452 @@
+[
+    {
+      "carrierShortName": "ACL",
+      "carrierName": "Atlantic Container Line",
+      "carrierSCAC": "ACLU"
+    },
+    {
+      "carrierShortName": "Alianca",
+      "carrierName": "Alianca",
+      "carrierSCAC": "ANRM"
+    },
+    {
+      "carrierShortName": "AML",
+      "carrierName": "Alaska Marine Lines",
+      "carrierSCAC": "AKMR"
+    },
+    {
+      "carrierShortName": "ANL",
+      "carrierName": "Australia National Line",
+      "carrierSCAC": "ANNU"
+    },
+    {
+      "carrierShortName": "APL",
+      "carrierName": "American President Lines",
+      "carrierSCAC": "APLU"
+    },
+    {
+      "carrierShortName": "Arkas",
+      "carrierName": "Arkas Container Transport S.A.",
+      "carrierSCAC": "ARKU"
+    },
+    {
+      "carrierShortName": "ARRC",
+      "carrierName": "Atlantic Ro-Ro Carriers Inc",
+      "carrierSCAC": "AROF"
+    },
+    {
+      "carrierShortName": "Bahri",
+      "carrierName": "Bahri / National Shipping Company of Saudi Arabia",
+      "carrierSCAC": "NSAU"
+    },
+    {
+      "carrierShortName": "BCL",
+      "carrierName": "Bermuda Container Line",
+      "carrierSCAC": "BCLU"
+    },
+    {
+      "carrierShortName": "CGL",
+      "carrierName": "Central Gulf Lines, Inc",
+      "carrierSCAC": "CEGL"
+    },
+    {
+      "carrierShortName": "CCNI",
+      "carrierName": "Compagnia Chilena de Navigacion Interoceanica SA",
+      "carrierSCAC": "CNIU"
+    },
+    {
+      "carrierShortName": "CHIPOLBROK",
+      "carrierName": "Chinese-Polish Joint Stock Shipping Company",
+      "carrierSCAC": "CPJQ"
+    },
+    {
+      "carrierShortName": "CMA CGM",
+      "carrierName": "Compagnie Maritime d'Affretement - Compagnie Générale Maritime",
+      "carrierSCAC": "CMDU"
+    },
+    {
+      "carrierShortName": "CNC Line",
+      "carrierName": "Cheng Lie Navigation Co.,Ltd",
+      "carrierSCAC": "11DX"
+    },
+    {
+      "carrierShortName": "COSCO",
+      "carrierName": "COSCO Container Lines",
+      "carrierSCAC": "COSU"
+    },
+    {
+      "carrierShortName": "Crowley",
+      "carrierName": "Crowley",
+      "carrierSCAC": "CMCU"
+    },
+    {
+      "carrierShortName": "Crowley",
+      "carrierName": "Crowley",
+      "carrierSCAC": "CAMN"
+    },
+    {
+      "carrierShortName": "CSAV",
+      "carrierName": "Compania Sud Americana de Vapores",
+      "carrierSCAC": "CHIW"
+    },
+    {
+      "carrierShortName": "CSAV Norasia",
+      "carrierName": "CSAV Norasia",
+      "carrierSCAC": "NSLU"
+    },
+    {
+      "carrierShortName": "CSCL",
+      "carrierName": "China Shipping Container Lines Co",
+      "carrierSCAC": "CHNJ"
+    },
+    {
+      "carrierShortName": "Delmas",
+      "carrierName": "Delmas",
+      "carrierSCAC": "DAAE"
+    },
+    {
+      "carrierShortName": "Dole",
+      "carrierName": "Dole Ocean Cargo Express",
+      "carrierSCAC": "DOLQ"
+    },
+    {
+      "carrierShortName": "Ecuadorian Line",
+      "carrierName": "Ecuadorian Line",
+      "carrierSCAC": "EQLI"
+    },
+    {
+      "carrierShortName": "Eimskip",
+      "carrierName": "Eimskip",
+      "carrierSCAC": "EIMU"
+    },
+    {
+      "carrierShortName": "Eimskip",
+      "carrierName": "Eimskip",
+      "carrierSCAC": "EIMW"
+    },
+    {
+      "carrierShortName": "Emirates",
+      "carrierName": "Emirates Shipping Line",
+      "carrierSCAC": "ESPU"
+    },
+    {
+      "carrierShortName": "Eukor",
+      "carrierName": "Eukor",
+      "carrierSCAC": "EUKO"
+    },
+    {
+      "carrierShortName": "Evergreen",
+      "carrierName": "Evergreen Line",
+      "carrierSCAC": "EGLV"
+    },
+    {
+      "carrierShortName": "FESCO",
+      "carrierName": "Far Eastern Shipping Company",
+      "carrierSCAC": "FESO"
+    },
+    {
+      "carrierShortName": "GAL",
+      "carrierName": "Galborg",
+      "carrierSCAC": "GFAL"
+    },
+    {
+      "carrierShortName": "Grieg Star",
+      "carrierName": "Grieg Star Shipping",
+      "carrierSCAC": "ACSU"
+    },
+    {
+      "carrierShortName": "Grimaldi",
+      "carrierName": "Grimaldi",
+      "carrierSCAC": "GRIU"
+    },
+    {
+      "carrierShortName": "GSL",
+      "carrierName": "Gold Star Line Ltd.",
+      "carrierSCAC": "GSLU"
+    },
+    {
+      "carrierShortName": "GWF",
+      "carrierName": "Great White Fleet",
+      "carrierSCAC": "UBCU"
+    },
+    {
+      "carrierShortName": "GES",
+      "carrierName": "Great Eastern Shipping Inc.",
+      "carrierSCAC": "GESC"
+    },
+    {
+      "carrierShortName": "HAMBURG SUD",
+      "carrierName": "Hamburg Sud",
+      "carrierSCAC": "SUDU"
+    },
+    {
+      "carrierShortName": "Hapag Lloyd",
+      "carrierName": "Hapag Lloyd Container Line",
+      "carrierSCAC": "HLCU"
+    },
+    {
+      "carrierShortName": "HMM",
+      "carrierName": "Hyundai Merchant Marine Co., Ltd.",
+      "carrierSCAC": "HDMU"
+    },
+    {
+      "carrierShortName": "Hoegh",
+      "carrierName": "Hoegh Autoliners",
+      "carrierSCAC": "HUAU"
+    },
+    {
+      "carrierShortName": "Horizon",
+      "carrierName": "Horizon Lines",
+      "carrierSCAC": "HRZU"
+    },
+    {
+      "carrierShortName": "Hyde Shipping",
+      "carrierName": "Hyde Shipping",
+      "carrierSCAC": "HYDU"
+    },
+    {
+      "carrierShortName": "ICL",
+      "carrierName": "Independent Container Line",
+      "carrierSCAC": "IILU"
+    },
+    {
+      "carrierShortName": "IMC",
+      "carrierName": "Industrial Maritime Carriers (Intermarine)",
+      "carrierSCAC": "IDMC"
+    },
+    {
+      "carrierShortName": "Interocean Lines",
+      "carrierName": "Interocean Lines",
+      "carrierSCAC": "INOC"
+    },
+    {
+      "carrierShortName": "K Line",
+      "carrierName": "Kawasaki Kisen Kaisha, Ltd.",
+      "carrierSCAC": "KKLU"
+    },
+    {
+      "carrierShortName": "King Ocean",
+      "carrierName": "King Ocean Sercies",
+      "carrierSCAC": "KOSL"
+    },
+    {
+      "carrierShortName": "KMTC",
+      "carrierName": "Korea Marine Transport Co., Ltd.",
+      "carrierSCAC": "KMTU"
+    },
+    {
+      "carrierShortName": "Libra",
+      "carrierName": "Companhia Libra de Navegacao",
+      "carrierSCAC": "CLIB"
+    },
+    {
+      "carrierShortName": "LGL",
+      "carrierName": "Liberty Global Logistics, LLC",
+      "carrierSCAC": "LGLT"
+    },
+    {
+      "carrierShortName": "Linea Messina",
+      "carrierName": "Linea Messina",
+      "carrierSCAC": "LMCU"
+    },
+    {
+      "carrierShortName": "Maersk",
+      "carrierName": "Maersk Line",
+      "carrierSCAC": "MAEU"
+    },
+    {
+      "carrierShortName": "Marfret",
+      "carrierName": "Marfret Compagnie Maritime",
+      "carrierSCAC": "MFTU"
+    },
+    {
+      "carrierShortName": "Maruba",
+      "carrierName": "Maruba",
+      "carrierSCAC": "MRUB"
+    },
+    {
+      "carrierShortName": "Matson",
+      "carrierName": "Matson",
+      "carrierSCAC": "MATS"
+    },
+    {
+      "carrierShortName": "MCC",
+      "carrierName": "MCC Transport Pte. Ltd.",
+      "carrierSCAC": "MCCQ"
+    },
+    {
+      "carrierShortName": "MISC",
+      "carrierName": "Malaysia International Shipping Corporation Berhad",
+      "carrierSCAC": "MISC"
+    },
+    {
+      "carrierShortName": "MSC",
+      "carrierName": "Mediterranean Shipping Company",
+      "carrierSCAC": "MSCU"
+    },
+    {
+      "carrierShortName": "NDS",
+      "carrierName": "Nile Dutch Africa Line",
+      "carrierSCAC": "NIDU"
+    },
+    {
+      "carrierShortName": "Neptune",
+      "carrierName": "Neptune Shipping Line",
+      "carrierSCAC": "NOSU"
+    },
+    {
+      "carrierShortName": "Nordana",
+      "carrierName": "Nordana Line",
+      "carrierSCAC": "NODA"
+    },
+    {
+      "carrierShortName": "Ocean Network Express",
+      "carrierName": "Ocean Network Express (ONE Line)",
+      "carrierSCAC": "ONEY"
+    },
+    {
+      "carrierShortName": "OOCL",
+      "carrierName": "Orient Overseas Container Line Ltd.",
+      "carrierSCAC": "OOLU"
+    },
+    {
+      "carrierShortName": "PHT",
+      "carrierName": "Pasha Hawaii Transport Lines",
+      "carrierSCAC": "PSHI"
+    },
+    {
+      "carrierShortName": "PIL",
+      "carrierName": "Pacific International Lines",
+      "carrierSCAC": "PCIU"
+    },
+    {
+      "carrierShortName": "PMO",
+      "carrierName": "PM&O Lines",
+      "carrierSCAC": "PMOL"
+    },
+    {
+      "carrierShortName": "PL",
+      "carrierName": "Polynesia Line",
+      "carrierSCAC": "PLLU"
+    },
+    {
+      "carrierShortName": "Rickmers Line",
+      "carrierName": "Rickmers Linie",
+      "carrierSCAC": "RCKI"
+    },
+    {
+      "carrierShortName": "Safmarine",
+      "carrierName": "Safmarine",
+      "carrierSCAC": "SAFM"
+    },
+    {
+      "carrierShortName": "Sallaum",
+      "carrierName": "Sallaum Lines",
+      "carrierSCAC": "SLAQ"
+    },
+    {
+      "carrierShortName": "SAM",
+      "carrierName": "Samskip, Inc.",
+      "carrierSCAC": "SKII"
+    },
+    {
+      "carrierShortName": "SCI",
+      "carrierName": "The Shipping Coporation of India Ltd.",
+      "carrierSCAC": "SCIU"
+    },
+    {
+      "carrierShortName": "Seaboard Marine",
+      "carrierName": "Seaboard Marine",
+      "carrierSCAC": "SMLU"
+    },
+    {
+      "carrierShortName": "SeaFreight",
+      "carrierName": "SeaFreight Line",
+      "carrierSCAC": "SEFN"
+    },
+    {
+      "carrierShortName": "Seago",
+      "carrierName": "Seago Line",
+      "carrierSCAC": "SEJJ"
+    },
+    {
+      "carrierShortName": "Siem Car",
+      "carrierName": "Siem Car Carriers AS",
+      "carrierSCAC": "SCYE"
+    },
+    {
+      "carrierShortName": "Sinokor",
+      "carrierName": "Sinokor Merchant Marine Co.,Ltd",
+      "carrierSCAC": "SKLU"
+    },
+    {
+      "carrierShortName": "Swire",
+      "carrierName": "Swire Shipping",
+      "carrierSCAC": "CHVW"
+    },
+    {
+      "carrierShortName": "TS",
+      "carrierName": "Thorco Shipping",
+      "carrierSCAC": "THZS"
+    },
+    {
+      "carrierShortName": "TSC",
+      "carrierName": "TOHO Shipping Co., Ltd",
+      "carrierSCAC": "TOHO"
+    },
+    {
+      "carrierShortName": "TOT",
+      "carrierName": "TOTE Maritime",
+      "carrierSCAC": "TOTE"
+    },
+    {
+      "carrierShortName": "Turkon",
+      "carrierName": "Turkon Line Inc",
+      "carrierSCAC": "TRKU"
+    },
+    {
+      "carrierShortName": "UAL",
+      "carrierName": "Universal Africa Lines",
+      "carrierSCAC": "UALC"
+    },
+    {
+      "carrierShortName": "USL",
+      "carrierName": "US Lines",
+      "carrierSCAC": "USLU"
+    },
+    {
+      "carrierShortName": "WEC",
+      "carrierName": "West European Container Lines",
+      "carrierSCAC": "WECU"
+    },
+    {
+      "carrierShortName": "Westwood",
+      "carrierName": "Westwood Shipping Lines",
+      "carrierSCAC": "WWSU"
+    },
+    {
+      "carrierShortName": "WHL",
+      "carrierName": "Wan Hai Lines",
+      "carrierSCAC": "22AA"
+    },
+    {
+      "carrierShortName": "WLS",
+      "carrierName": "World Logistics Service (USA) Inc",
+      "carrierSCAC": "WDLS"
+    },
+    {
+      "carrierShortName": "WWL",
+      "carrierName": "Wallenius Wilhelmsen Logistics",
+      "carrierSCAC": "WLWH"
+    },
+    {
+      "carrierShortName": "YML",
+      "carrierName": "Yang Ming Line",
+      "carrierSCAC": "YMLU"
+    },
+    {
+      "carrierShortName": "ZIM",
+      "carrierName": "ZIM Integrated Shipping Services Ltd",
+      "carrierSCAC": "ZIMU"
+    }
+]

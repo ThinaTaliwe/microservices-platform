@@ -1,0 +1,17 @@
+{
+  "shipments": "http://192.168.1.9/siya/api/shipments/shipments/",
+  "shipment-items": "http://192.168.1.9/siya/api/shipments/shipment-items/",
+  "shipment-types": "http://192.168.1.9/siya/api/shipments/shipment-types/",
+  "shipment-has-shipment": "http://192.168.1.9/siya/api/shipments/shipment-has-shipment/",
+  "shipment-has-previous-shipments": "http://192.168.1.9/siya/api/shipments/shipment-has-previous-shipments/",
+
+  "loadings": "http://192.168.1.9/siya/api/loading/loadings/",
+
+  "movements": "http://192.168.1.9/siya/api/movement/movements/",
+  "movement-items": "http://192.168.1.9/siya/api/movement/movement-items/",
+  "offloadings": "http://192.168.1.9/siya/api/movement/offloadings/",
+  "offloading-items": "http://192.168.1.9/siya/api/movement/offloading-items/",
+  
+  "storage": "http://192.168.1.9/siya/api/storage/storage/",
+  "storage-items": "http://192.168.1.9/siya/api/storage/storage-items/"
+}
