@@ -6,6 +6,25 @@ use App\Http\Controllers\Api\SiyaProxyController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Http;
 
+Route::get('/api/proxy/movement', function () {
+    $base = rtrim(env('SIYA_API_BASE', 'http://siya-app:8000'), '/');
+    $url  = $base . '/siya/api/movement/';
+
+    try {
+        $res = Http::timeout(15)->acceptJson()->get($url);
+
+        return response()->json($res->json(), $res->status());
+
+    } catch (\Throwable $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Failed to reach Siya API',
+            'url' => $url,
+            'details' => $e->getMessage(),
+        ], 504);
+    }
+});
+
 // Route::prefix('bfrn')->group(function () {
 
 //     Route::get('/shipcreate', [\App\Http\Controllers\ShipmentWebController::class, 'create'])
