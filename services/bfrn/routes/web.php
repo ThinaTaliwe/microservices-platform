@@ -6,25 +6,6 @@ use App\Http\Controllers\Api\SiyaProxyController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Http;
 
-Route::get('/api/proxy/movement', function () {
-    $base = rtrim(env('SIYA_API_BASE', 'http://siya-app:8000'), '/');
-    $url  = $base . '/siya/api/movement/';
-
-    try {
-        $res = Http::timeout(15)->acceptJson()->get($url);
-
-        return response()->json($res->json(), $res->status());
-
-    } catch (\Throwable $e) {
-        return response()->json([
-            'status' => 'error',
-            'message' => 'Failed to reach Siya API',
-            'url' => $url,
-            'details' => $e->getMessage(),
-        ], 504);
-    }
-});
-
 // Route::prefix('bfrn')->group(function () {
 
 //     Route::get('/shipcreate', [\App\Http\Controllers\ShipmentWebController::class, 'create'])
@@ -144,6 +125,21 @@ Route::prefix('bfrn')->name('bfrn.')->group(function () {
         Route::get('/shipments', [SiyaProxyController::class, 'shipmentsIndex'])->name('api.shipments.index');
         Route::post('/shipments', [SiyaProxyController::class, 'shipmentsStore'])->name('api.shipments.store');
         Route::get('/shipments/{id}', [SiyaProxyController::class, 'shipmentsShow'])->name('api.shipments.show');
+        Route::get('/shipments', [SiyaProxyController::class, 'shipmentsIndex']);
+        Route::post('/shipments', [SiyaProxyController::class, 'shipmentsStore']);
+        Route::get('/shipments/{id}', [SiyaProxyController::class, 'shipmentsShow']);
+
+        Route::get('/loading/loadings', [SiyaProxyController::class, 'loadings']);
+        Route::get('/loading/loading-items', [SiyaProxyController::class, 'loadingItems']);
+
+        Route::get('/movement/movements', [SiyaProxyController::class, 'movements']);
+        Route::get('/movement/movement-items', [SiyaProxyController::class, 'movementItems']);
+
+        Route::get('/offloading/offloadings', [SiyaProxyController::class, 'offloadings']);
+        Route::get('/offloading/offloading-items', [SiyaProxyController::class, 'offloadingItems']);
+
+        Route::get('/storage/storage', [SiyaProxyController::class, 'storage']);
+        Route::get('/storage/storage-items', [SiyaProxyController::class, 'storageItems']);
     });
 });
 
