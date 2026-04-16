@@ -402,14 +402,14 @@ async function fetchJSON(url, options = {}) {
   return { res, payload };
 }
 
-const API = {
-  buList: "http://192.168.1.9/siya/api/bu/",
-  addressesListCreate: "http://192.168.1.9/siya/api/addresses/",
-  shipmentTypes: "http://192.168.1.9/siya/api/shipments/shipment-types/",
-  instructionListCreate: "http://192.168.1.9/siya/api/shipments/shipment-instructions/",
-  createShipment: "http://192.168.1.9/siya/api/shipments/shipments/",
-  addressTypes: "http://192.168.1.9/siya/api/addresses/address-types/",
-};
+const API = @json([
+  'buList' => route('bfrn.api.bu.index'),
+  'addressesListCreate' => route('bfrn.api.addresses.index'),
+  'shipmentTypes' => route('bfrn.api.shipment-types.index'),
+  'instructionListCreate' => route('bfrn.api.shipment-instructions.store'),
+  'createShipment' => route('bfrn.api.shipments.store'),
+  'addressTypes' => route('bfrn.api.address-types.index'),
+]);
 
 const debugBox = document.getElementById('debugBox');
 const msgBox = document.getElementById('msgBox');
@@ -520,8 +520,8 @@ btnLoadMeta.addEventListener('click', async () => {
   fillSelectWithObjects(document.getElementById('selInstructionType'), typeRows, "Select Instruction Type…");
 
   showMsg('ok', 'Dropdowns loaded.', [
-    'BU loaded from /siya/api/bu/',
-    'Shipment Type loaded from /siya/api/shipments/shipment-types/',
+    'BU loaded from /bfrn/api/bu',
+    'Shipment Type loaded from /bfrn/api/shipments/shipment-types',
     'Instruction Type is temporarily using shipment-types as fallback.'
   ]);
 });

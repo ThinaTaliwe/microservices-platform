@@ -55,6 +55,48 @@ class SiyaProxyController extends Controller
     }
 
     // -------- Shipments (CRUD) --------
+    public function buIndex(Request $request)
+    {
+        $url = $this->url('/api/bu/');
+        $res = $this->client($request)->get($url, $request->query());
+        return $this->passthrough($res);
+    }
+
+    public function addressesIndex(Request $request)
+    {
+        $url = $this->url('/api/addresses/');
+        $res = $this->client($request)->get($url, $request->query());
+        return $this->passthrough($res);
+    }
+
+    public function addressesStore(Request $request)
+    {
+        $url = $this->url('/api/addresses/');
+        $res = $this->client($request)->post($url, $request->all());
+        return $this->passthrough($res);
+    }
+
+    public function addressTypesIndex(Request $request)
+    {
+        $url = $this->url('/api/addresses/address-types/');
+        $res = $this->client($request)->get($url, $request->query());
+        return $this->passthrough($res);
+    }
+
+    public function shipmentTypesIndex(Request $request)
+    {
+        $url = $this->url('/api/shipments/shipment-types/');
+        $res = $this->client($request)->get($url, $request->query());
+        return $this->passthrough($res);
+    }
+
+    public function shipmentInstructionsStore(Request $request)
+    {
+        $url = $this->url('/api/shipments/shipment-instructions/');
+        $res = $this->client($request)->post($url, $request->all());
+        return $this->passthrough($res);
+    }
+
     public function shipmentsIndex(Request $request)
     {
         // Siya endpoint example: /api/shipments/shipments/

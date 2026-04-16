@@ -132,10 +132,18 @@ Route::prefix('bfrn')->name('bfrn.')->group(function () {
 
     // API Proxy Routes
     Route::prefix('api')->group(function () {
-        Route::get('/shipments', [SiyaProxyController::class, 'shipmentsIndex']);
-        Route::post('/shipments', [SiyaProxyController::class, 'shipmentsStore']);
-        Route::get('/shipments/{id}', [SiyaProxyController::class, 'shipmentsShow']);
-        // ... other API routes
+        Route::get('/bu', [SiyaProxyController::class, 'buIndex'])->name('api.bu.index');
+
+        Route::get('/addresses', [SiyaProxyController::class, 'addressesIndex'])->name('api.addresses.index');
+        Route::post('/addresses', [SiyaProxyController::class, 'addressesStore'])->name('api.addresses.store');
+        Route::get('/addresses/address-types', [SiyaProxyController::class, 'addressTypesIndex'])->name('api.address-types.index');
+
+        Route::get('/shipments/shipment-types', [SiyaProxyController::class, 'shipmentTypesIndex'])->name('api.shipment-types.index');
+        Route::post('/shipments/shipment-instructions', [SiyaProxyController::class, 'shipmentInstructionsStore'])->name('api.shipment-instructions.store');
+
+        Route::get('/shipments', [SiyaProxyController::class, 'shipmentsIndex'])->name('api.shipments.index');
+        Route::post('/shipments', [SiyaProxyController::class, 'shipmentsStore'])->name('api.shipments.store');
+        Route::get('/shipments/{id}', [SiyaProxyController::class, 'shipmentsShow'])->name('api.shipments.show');
     });
 });
 
