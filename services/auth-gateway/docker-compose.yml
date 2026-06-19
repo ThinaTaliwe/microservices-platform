@@ -1,0 +1,47 @@
+services:
+  auth-gateway-php:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.fpm
+    container_name: auth-gateway-php
+    working_dir: /var/www/html
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      - auth-gateway-mysql
+    networks:
+      - auth-gateway-net
+
+  auth-gateway-nginx:
+    image: nginx:1.27-alpine
+    container_name: auth-gateway-nginx
+    ports:
+      - "8091:80"
+    volumes:
+      - .:/var/www/html
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - auth-gateway-php
+    networks:
+      - auth-gateway-net
+
+  auth-gateway-mysql:
+    image: mysql:8.4
+    container_name: auth-gateway-mysql
+    environment:
+      MYSQL_DATABASE: auth_gateway
+      MYSQL_USER: auth_gateway
+      MYSQL_PASSWORD: change_me
+      MYSQL_ROOT_PASSWORD: change_root_me
+    volumes:
+      - auth_gateway_mysql_data:/var/lib/mysql
+      - ./database/schema/auth_gateway.sql:/docker-entrypoint-initdb.d/001-auth-gateway.sql:ro
+    networks:
+      - auth-gateway-net
+
+volumes:
+  auth_gateway_mysql_data:
+
+networks:
+  auth-gateway-net:
+    name: auth-gateway-net

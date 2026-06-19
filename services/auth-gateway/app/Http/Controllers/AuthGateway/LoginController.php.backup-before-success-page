@@ -1,0 +1,193 @@
+<?php
+
+namespace App\Http\Controllers\AuthGateway;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+
+class LoginController extends Controller
+{
+    public function show()
+    {
+        return view('auth-gateway.login');
+    }
+
+    public function submit(Request $request)
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email', 'max:255'],
+            'timezone' => ['nullable', 'string', 'max:100'],
+            'screen' => ['nullable', 'string', 'max:100'],
+            'platform' => ['nullable', 'string', 'max:120'],
+            'language' => ['nullable', 'string', 'max:80'],
+        ]);
+
+        $email = Str::lower(trim($validated['email']));
+        $emailHash = hash_hmac('sha256', $email, config('app.key'));
+
+        $bfrnUser = DB::connection('bfrn_mysql')
+            ->table('users')
+            ->where('email', $email)
+            ->first(['id', 'name', 'email', 'welcome_valid_until']);
+
+        $bfrnUserExists = (bool) $bfrnUser;
+
+        $bfrnUserActive = $bfrnUserExists
+            && (!$bfrnUser->welcome_valid_until || strtotime($bfrnUser->welcome_valid_until) >= time());
+
+        $riskLevel = ($bfrnUserExists && $bfrnUserActive) ? 'low' : 'high';
+
+        $decision = ($bfrnUserExists && $bfrnUserActive)
+            ? 'captured'
+            : 'supervisor_review';
+
+        $decisionReason = match (true) {
+            !$bfrnUserExists => 'Email does not exist in BFRN users table. Supervisor review required.',
+            !$bfrnUserActive => 'BFRN user exists but is disabled. Supervisor review required.',
+            default => 'BFRN user verified. Handoff not enabled yet.',
+        };
+
+        $ip = $request->ip();
+        $userAgent = (string) $request->userAgent();
+
+        $deviceSource = implode('|', [
+            $userAgent,
+            $validated['timezone'] ?? '',
+            $validated['screen'] ?? '',
+            $validated['platform'] ?? '',
+            $validated['language'] ?? '',
+        ]);
+
+        $deviceHash = hash_hmac('sha256', $deviceSource, config('app.key'));
+        $ipHash = $ip ? hash_hmac('sha256', $ip, config('app.key')) : null;
+
+        $payload = [
+            'email' => $email,
+            'ip' => $ip,
+            'user_agent' => $userAgent,
+            'timezone' => $validated['timezone'] ?? null,
+            'screen' => $validated['screen'] ?? null,
+            'platform' => $validated['platform'] ?? null,
+            'language' => $validated['language'] ?? null,
+            'accept_language' => $request->header('Accept-Language'),
+            'referer' => $request->header('Referer'),
+            'bfrn_user_exists' => $bfrnUserExists,
+            'bfrn_user_active' => $bfrnUserActive,
+            'bfrn_user_id' => $bfrnUser->id ?? null,
+            'risk_level' => $riskLevel,
+            'decision' => $decision,
+            'submitted_at' => now()->toDateTimeString(),
+        ];
+
+        $identityId = DB::table('auth_identities')->where('email_hash', $emailHash)->value('id');
+
+        if (!$identityId) {
+            $identityId = DB::table('auth_identities')->insertGetId([
+                'bfrn_user_id' => $bfrnUser->id ?? null,
+                'email_hash' => $emailHash,
+                'email_encrypted' => Crypt::encryptString($email),
+                'status' => 'active',
+                'last_seen_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        } else {
+            DB::table('auth_identities')
+                ->where('id', $identityId)
+                ->update([
+                    'bfrn_user_id' => $bfrnUser->id ?? null,
+                    'last_seen_at' => now(),
+                    'updated_at' => now(),
+                ]);
+        }
+
+        DB::table('auth_devices')->updateOrInsert(
+            [
+                'auth_identity_id' => $identityId,
+                'device_hash' => $deviceHash,
+            ],
+            [
+                'device_payload_encrypted' => Crypt::encryptString(json_encode($payload)),
+                'last_seen_at' => now(),
+                'updated_at' => now(),
+            ]
+        );
+
+        $attemptId = DB::table('auth_login_attempts')->insertGetId([
+            'auth_identity_id' => $identityId,
+            'email_hash' => $emailHash,
+            'ip_hash' => $ipHash,
+            'device_hash' => $deviceHash,
+            'payload_encrypted' => Crypt::encryptString(json_encode($payload)),
+            'risk_level' => $riskLevel,
+            'decision' => $decision,
+            'decision_reason' => $decisionReason,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('auth_security_events')->insert([
+            'auth_identity_id' => $identityId,
+            'login_attempt_id' => $attemptId,
+            'event' => 'login_attempt_captured',
+            'payload_encrypted' => Crypt::encryptString(json_encode([
+                'email_hash' => $emailHash,
+                'ip_hash' => $ipHash,
+                'device_hash' => $deviceHash,
+                'risk_level' => $riskLevel,
+                'decision' => $decision,
+                'bfrn_user_exists' => $bfrnUserExists,
+                'bfrn_user_active' => $bfrnUserActive,
+            ])),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        if ($decision === 'supervisor_review') {
+            $supervisors = collect(explode(',', (string) env('AUTH_GATEWAY_SUPERVISORS')))
+                ->map(fn ($email) => Str::lower(trim($email)))
+                ->filter()
+                ->unique()
+                ->values();
+
+            foreach ($supervisors as $supervisorEmail) {
+                $approvalToken = Str::random(64);
+
+                DB::table('auth_pending_approvals')->insert([
+                    'login_attempt_id' => $attemptId,
+                    'auth_identity_id' => $identityId,
+                    'supervisor_email_hash' => hash_hmac('sha256', $supervisorEmail, config('app.key')),
+                    'approval_token_hash' => hash_hmac('sha256', $approvalToken, config('app.key')),
+                    'status' => 'pending',
+                    'expires_at' => now()->addMinutes((int) env('AUTH_GATEWAY_APPROVAL_TTL_MINUTES', 30)),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                DB::table('auth_security_events')->insert([
+                    'auth_identity_id' => $identityId,
+                    'login_attempt_id' => $attemptId,
+                    'event' => 'supervisor_approval_created',
+                    'payload_encrypted' => Crypt::encryptString(json_encode([
+                        'supervisor_email' => $supervisorEmail,
+                        'approval_token_preview' => substr($approvalToken, 0, 8) . '...',
+                        'expires_minutes' => (int) env('AUTH_GATEWAY_APPROVAL_TTL_MINUTES', 30),
+                    ])),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        }
+
+        if ($decision === 'captured') {
+            return response()->view('auth-gateway.redirect-to-bfrn', [
+                'bfrnLoginUrl' => 'http://192.168.1.9:8080/bfrn/login',
+            ]);
+        }
+
+        return back()->with('success', 'Login request captured for supervisor review.');
+    }
+}

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Supervisor Review</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <style>
+        [x-cloak] { display: none !important; }
+        button:disabled { opacity: .65; cursor: not-allowed !important; }
+    </style>
+
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+
+<body style="margin:0; font-family:Arial, sans-serif; background:#f3f4f6; color:#111827;">
+
+<div style="max-width:1180px; margin:0 auto; padding:32px 20px;">
+    <header style="margin-bottom:24px;">
+        <h1 style="margin:0; font-size:28px; font-weight:800;">Supervisor Review Queue</h1>
+        <p style="margin:8px 0 0; color:#6b7280; font-size:14px;">
+            Review authentication requests that need manual approval.
+        </p>
+    </header>
+
+    @if(session('success'))
+        <div style="background:#ecfdf5; border:1px solid #a7f3d0; color:#047857; padding:14px 16px; border-radius:12px; margin-bottom:18px; font-size:14px; font-weight:700;">
+            {{ session('success') }}
+        </div>
+    @endif
+
+    <section style="display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:14px; margin-bottom:18px;">
+        <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:14px; padding:16px;">
+            <div style="color:#6b7280; font-size:13px; font-weight:700;">Pending</div>
+            <div style="font-size:28px; font-weight:900; margin-top:4px;">{{ $summary['pending'] }}</div>
+        </div>
+
+        <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:14px; padding:16px;">
+            <div style="color:#6b7280; font-size:13px; font-weight:700;">Approved</div>
+            <div style="font-size:28px; font-weight:900; margin-top:4px;">{{ $summary['approved'] }}</div>
+        </div>
+
+        <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:14px; padding:16px;">
+            <div style="color:#6b7280; font-size:13px; font-weight:700;">Blocked</div>
+            <div style="font-size:28px; font-weight:900; margin-top:4px;">{{ $summary['blocked'] }}</div>
+        </div>
+
+        <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:14px; padding:16px;">
+            <div style="color:#6b7280; font-size:13px; font-weight:700;">Expired</div>
+            <div style="font-size:28px; font-weight:900; margin-top:4px;">{{ $summary['expired'] }}</div>
+        </div>
+    </section>
+
+    <section style="background:#ffffff; border:1px solid #e5e7eb; border-radius:16px; overflow:hidden; box-shadow:0 8px 22px rgba(15,23,42,.06);">
+        <table style="width:100%; border-collapse:collapse; font-size:14px;">
+            <thead style="background:#f9fafb; color:#374151;">
+                <tr>
+                    <th style="text-align:left; padding:14px 16px;">ID</th>
+                    <th style="text-align:left; padding:14px 16px;">Risk</th>
+                    <th style="text-align:left; padding:14px 16px;">Status</th>
+                    <th style="text-align:left; padding:14px 16px;">Reason</th>
+                    <th style="text-align:left; padding:14px 16px;">Expires</th>
+                    <th style="text-align:right; padding:14px 16px;">Actions</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @forelse($approvals as $approval)
+                    <tr style="border-top:1px solid #e5e7eb;">
+                        <td style="padding:14px 16px; font-weight:700;">{{ $approval->id }}</td>
+
+                        <td style="padding:14px 16px;">
+                            <span style="display:inline-flex; padding:5px 9px; border-radius:999px; background:#fff7ed; color:#c2410c; font-size:12px; font-weight:800;">
+                                {{ strtoupper($approval->risk_level) }}
+                            </span>
+                        </td>
+
+                        <td style="padding:14px 16px;">
+                            @php
+                                $statusStyle = match($approval->status) {
+                                    'approved' => 'background:#ecfdf5;color:#047857;border-color:#a7f3d0;',
+                                    'blocked' => 'background:#fef2f2;color:#b91c1c;border-color:#fecaca;',
+                                    default => 'background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe;',
+                                };
+                            @endphp
+
+                            <span style="display:inline-flex; padding:5px 9px; border:1px solid; border-radius:999px; font-size:12px; font-weight:800; {{ $statusStyle }}">
+                                {{ strtoupper($approval->status) }}
+                            </span>
+                        </td>
+
+                        <td style="padding:14px 16px; color:#374151;">
+                            {{ $approval->decision_reason }}
+                        </td>
+
+                        <td style="padding:14px 16px; color:#4b5563;">
+                            {{ $approval->expires_at }}
+                        </td>
+
+                        <td style="padding:14px 16px; text-align:right;">
+                            @if($approval->status === 'pending')
+                                <div style="display:flex; justify-content:flex-end; gap:8px;">
+                                    <form method="POST" action="/supervisor/{{ $approval->id }}/approve" onsubmit="return confirm('Approve this login request?');">
+                                        @csrf
+                                        <button
+                                            type="submit"
+                                            style="border:0; background:#059669; color:#fff; padding:9px 12px; border-radius:9px; font-weight:800; cursor:pointer;"
+                                        >
+                                            Approve
+                                        </button>
+                                    </form>
+
+                                    <form method="POST" action="/supervisor/{{ $approval->id }}/block" onsubmit="return confirm('Block this login request?');">
+                                        @csrf
+                                        <button
+                                            type="submit"
+                                            style="border:0; background:#dc2626; color:#fff; padding:9px 12px; border-radius:9px; font-weight:800; cursor:pointer;"
+                                        >
+                                            Block
+                                        </button>
+                                    </form>
+                                </div>
+                            @else
+                                <span style="color:#9ca3af; font-size:13px;">Decided</span>
+                            @endif
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="6" style="padding:36px 16px; text-align:center; color:#6b7280;">
+                            No approval requests found.
+                        </td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </section>
+
+
+</div>
+
+</body>
+</html>
