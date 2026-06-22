@@ -58,7 +58,7 @@
                     <th style="text-align:left; padding:14px 16px;">ID</th>
                     <th style="text-align:left; padding:14px 16px;">Risk</th>
                     <th style="text-align:left; padding:14px 16px;">Status</th>
-                    <th style="text-align:left; padding:14px 16px;">Reason</th>
+                    <th style="text-align:left; padding:14px 16px;">Login Details</th>
                     <th style="text-align:left; padding:14px 16px;">Expires</th>
                     <th style="text-align:right; padding:14px 16px;">Actions</th>
                 </tr>
@@ -66,7 +66,7 @@
 
             <tbody>
                 @forelse($approvals as $approval)
-                    <tr style="border-top:1px solid #e5e7eb;">
+                    <tr id="approval-{{ $approval->id }}" style="border-top:1px solid #e5e7eb; {{ request('approval') == $approval->id ? 'background:#eff6ff;' : '' }}">
                         <td style="padding:14px 16px; font-weight:700;">{{ $approval->id }}</td>
 
                         <td style="padding:14px 16px;">
@@ -89,8 +89,27 @@
                             </span>
                         </td>
 
-                        <td style="padding:14px 16px; color:#374151;">
-                            {{ $approval->decision_reason }}
+                        <td style="padding:14px 16px; color:#374151; min-width:460px;">
+                            <div style="font-weight:800; color:#111827; margin-bottom:6px;">
+                                {{ $approval->email }}
+                            </div>
+
+                            <div style="font-size:13px; margin-bottom:8px;">
+                                {{ $approval->decision_reason }}
+                            </div>
+
+                            <div style="font-size:12px; color:#6b7280; line-height:1.7;">
+                                <div><strong>BFRN User ID:</strong> {{ $approval->bfrn_user_id ?? 'Not linked' }}</div>
+                                <div><strong>Device:</strong> {{ $approval->device_label }}</div>
+                                <div><strong>Location:</strong> {{ $approval->location }}</div>
+                                <div><strong>IP:</strong> {{ $approval->ip }}</div>
+                                <div><strong>Platform:</strong> {{ $approval->platform }}</div>
+                                <div><strong>Screen:</strong> {{ $approval->screen }}</div>
+                                <div><strong>Timezone:</strong> {{ $approval->timezone }}</div>
+                                <div style="max-width:520px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                                    <strong>Browser:</strong> {{ $approval->user_agent }}
+                                </div>
+                            </div>
                         </td>
 
                         <td style="padding:14px 16px; color:#4b5563;">

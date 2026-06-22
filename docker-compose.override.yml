@@ -1,0 +1,9 @@
+services:
+  bfrn-php:
+    networks:
+      - internal
+      - auth-gateway-net
+
+networks:
+  auth-gateway-net:
+    external: true

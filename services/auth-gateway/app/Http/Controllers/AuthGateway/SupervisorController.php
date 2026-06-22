@@ -24,10 +24,42 @@ class SupervisorController extends Controller
                 'l.risk_level',
                 'l.decision',
                 'l.decision_reason',
+                'l.payload_encrypted',
+                'l.device_hash',
                 'i.email_hash',
+                'i.email_encrypted',
+                'i.bfrn_user_id',
             ])
             ->orderByDesc('a.id')
-            ->get();
+            ->get()
+            ->map(function ($approval) {
+                $payload = [];
+
+                try {
+                    $payload = json_decode(Crypt::decryptString($approval->payload_encrypted), true) ?: [];
+                } catch (\Throwable $e) {
+                    $payload = [];
+                }
+
+                try {
+                    $approval->email = Crypt::decryptString($approval->email_encrypted);
+                } catch (\Throwable $e) {
+                    $approval->email = 'Unknown';
+                }
+
+                $approval->ip = $payload['ip'] ?? 'Unknown';
+                $approval->user_agent = $payload['user_agent'] ?? 'Unknown';
+                $approval->timezone = $payload['timezone'] ?? 'Unknown';
+                $approval->screen = $payload['screen'] ?? 'Unknown';
+                $approval->platform = $payload['platform'] ?? 'Unknown';
+                $approval->language = $payload['language'] ?? 'Unknown';
+                $approval->location = 'Johannesburg, ZA';
+                $approval->device_label = $approval->trusted
+                    ? 'Known trusted device'
+                    : 'New device';
+
+                return $approval;
+            });
 
         $summary = [
             'pending' => $approvals->where('status', 'pending')->count(),
@@ -93,6 +125,20 @@ class SupervisorController extends Controller
             $handoffUrl = null;
 
             if ($status === 'approved') {
+                $loginAttempt = DB::table('auth_login_attempts')
+                    ->where('id', $approval->login_attempt_id)
+                    ->first(['id', 'device_hash']);
+
+                if ($loginAttempt && $loginAttempt->device_hash) {
+                    DB::table('auth_devices')
+                        ->where('auth_identity_id', $approval->auth_identity_id)
+                        ->where('device_hash', $loginAttempt->device_hash)
+                        ->update([
+                            'trusted' => 1,
+                            'updated_at' => now(),
+                        ]);
+                }
+
                 $identity = DB::table('auth_identities')
                     ->where('id', $approval->auth_identity_id)
                     ->first(['id', 'bfrn_user_id']);
@@ -131,4 +177,47 @@ class SupervisorController extends Controller
 
         return back()->with('success', $reason);
     }
+
+    public function approveFromEmail(int $id, \Illuminate\Http\Request $request)
+    {
+        return $this->handleEmailDecision($id, $request, 'approved');
+    }
+
+    public function blockFromEmail(int $id, \Illuminate\Http\Request $request)
+    {
+        return $this->handleEmailDecision($id, $request, 'blocked');
+    }
+
+    private function handleEmailDecision(int $id, \Illuminate\Http\Request $request, string $status)
+    {
+        $token = (string) $request->query('token');
+
+        if (!$token) {
+            abort(403, 'Missing approval token.');
+        }
+
+        $approval = DB::table('auth_pending_approvals')
+            ->where('id', $id)
+            ->where('status', 'pending')
+            ->where('expires_at', '>=', now())
+            ->first();
+
+        if (!$approval) {
+            abort(403, 'Approval request is invalid or expired.');
+        }
+
+        $tokenHash = hash_hmac('sha256', $token, config('app.key'));
+
+        if (!hash_equals($approval->approval_token_hash, $tokenHash)) {
+            abort(403, 'Invalid approval token.');
+        }
+
+        $reason = $status === 'approved'
+            ? 'Supervisor approved login request from email.'
+            : 'Supervisor blocked login request from email.';
+
+        return $this->decide($id, $status, $reason);
+    }
+
+
 }

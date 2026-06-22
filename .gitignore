@@ -22,3 +22,58 @@
 # editor
 .vscode/
 .idea/
+
+# Temporary files
+*.backup*
+*.bak
+*.old
+
+# Archives
+*.zip
+*.tar.gz
+
+# Audit artifacts
+docker-audit-report/
+docker_project_audit.py
+
+# Environment backups
+.env.backup*
+.env.secure.backup
+
+# Docker export artifacts
+sha256:*
+extracting
+
+# Temporary files
+*.backup*
+*.bak
+*.old
+
+# Archives
+*.zip
+*.tar.gz
+
+# Audit artifacts
+docker-audit-report/
+docker_project_audit.py
+
+# Environment backups
+.env.backup*
+.env.secure.backup
+
+# Docker export artifacts
+sha256:*
+extracting
+
+# Docker export artifacts
+sha256:*
+extracting
+exporting
+transferring
+reading
+resolve
+resolving
+naming
+[internal]
+[stage-0
+[users-php

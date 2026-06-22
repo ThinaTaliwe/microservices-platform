@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\SupervisorLoginApprovalMail;
 use Illuminate\Support\Str;
 
 class LoginController extends Controller
@@ -38,18 +40,6 @@ class LoginController extends Controller
         $bfrnUserActive = $bfrnUserExists
             && (!$bfrnUser->welcome_valid_until || strtotime($bfrnUser->welcome_valid_until) >= time());
 
-        $riskLevel = ($bfrnUserExists && $bfrnUserActive) ? 'low' : 'high';
-
-        $decision = ($bfrnUserExists && $bfrnUserActive)
-            ? 'captured'
-            : 'supervisor_review';
-
-        $decisionReason = match (true) {
-            !$bfrnUserExists => 'Email does not exist in BFRN users table. Supervisor review required.',
-            !$bfrnUserActive => 'BFRN user exists but is disabled. Supervisor review required.',
-            default => 'BFRN user verified. Handoff not enabled yet.',
-        };
-
         $ip = $request->ip();
         $userAgent = (string) $request->userAgent();
 
@@ -63,6 +53,38 @@ class LoginController extends Controller
 
         $deviceHash = hash_hmac('sha256', $deviceSource, config('app.key'));
         $ipHash = $ip ? hash_hmac('sha256', $ip, config('app.key')) : null;
+
+        $knownTrustedDevice = false;
+
+        if ($bfrnUserExists && $bfrnUserActive) {
+            $existingIdentityId = DB::table('auth_identities')->where('email_hash', $emailHash)->value('id');
+
+            if ($existingIdentityId) {
+                $knownTrustedDevice = DB::table('auth_devices')
+                    ->where('auth_identity_id', $existingIdentityId)
+                    ->where('device_hash', $deviceHash)
+                    ->where('trusted', 1)
+                    ->exists();
+            }
+        }
+
+        $riskLevel = match (true) {
+            !$bfrnUserExists => 'high',
+            !$bfrnUserActive => 'high',
+            !$knownTrustedDevice => 'high',
+            default => 'low',
+        };
+
+        $decision = $riskLevel === 'low'
+            ? 'captured'
+            : 'supervisor_review';
+
+        $decisionReason = match (true) {
+            !$bfrnUserExists => 'Email does not exist in BFRN users table. Supervisor review required.',
+            !$bfrnUserActive => 'BFRN user exists but is disabled. Supervisor review required.',
+            !$knownTrustedDevice => 'New device detected. Supervisor review required.',
+            default => 'Known active BFRN user using trusted device.',
+        };
 
         $payload = [
             'email' => $email,
@@ -156,7 +178,7 @@ class LoginController extends Controller
             foreach ($supervisors as $supervisorEmail) {
                 $approvalToken = Str::random(64);
 
-                DB::table('auth_pending_approvals')->insert([
+                $approvalId = DB::table('auth_pending_approvals')->insertGetId([
                     'login_attempt_id' => $attemptId,
                     'auth_identity_id' => $identityId,
                     'supervisor_email_hash' => hash_hmac('sha256', $supervisorEmail, config('app.key')),
@@ -179,13 +201,48 @@ class LoginController extends Controller
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
+
+                Mail::to($supervisorEmail)->send(new SupervisorLoginApprovalMail([
+                    'masked_email' => preg_replace('/(^.).*(@.*$)/', '$1***$2', $email),
+                    'device' => $knownTrustedDevice ? 'Known device' : 'New device',
+                    'location' => 'Johannesburg, ZA',
+                    'risk' => ucfirst($riskLevel),
+                    'reason' => $decisionReason,
+                    'supervisor_url' => rtrim((string) env('APP_URL'), '/') . '/supervisor?approval=' . $approvalId,
+                    'approve_url' => rtrim((string) env('APP_URL'), '/') . '/supervisor/email/' . $approvalId . '/approve?token=' . urlencode($approvalToken),
+                    'block_url' => rtrim((string) env('APP_URL'), '/') . '/supervisor/email/' . $approvalId . '/block?token=' . urlencode($approvalToken),
+                ]));
             }
         }
 
         if ($decision === 'captured') {
-            return view('auth-gateway.verified', [
-                'bfrnLoginUrl' => 'http://192.168.1.9:8080/bfrn/login',
+            $handoffToken = Str::random(80);
+
+            DB::table('auth_handoff_tokens')->insert([
+                'auth_identity_id' => $identityId,
+                'bfrn_user_id' => $bfrnUser->id,
+                'token_hash' => hash_hmac('sha256', $handoffToken, env('AUTH_GATEWAY_HANDOFF_SECRET')),
+                'expires_at' => now()->addMinutes((int) env('AUTH_GATEWAY_TOKEN_TTL_MINUTES', 5)),
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
+
+            DB::table('auth_security_events')->insert([
+                'auth_identity_id' => $identityId,
+                'login_attempt_id' => $attemptId,
+                'event' => 'low_risk_handoff_created',
+                'payload_encrypted' => Crypt::encryptString(json_encode([
+                    'bfrn_user_id' => $bfrnUser->id,
+                    'expires_minutes' => (int) env('AUTH_GATEWAY_TOKEN_TTL_MINUTES', 5),
+                    'created_at' => now()->toDateTimeString(),
+                ])),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            return redirect(
+                rtrim((string) env('BFRN_BASE_URL'), '/') . '/bfrn/gateway-login?token=' . $handoffToken
+            );
         }
 
         return back()->with('success', 'Login request captured for supervisor review.');

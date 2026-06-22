@@ -9,6 +9,13 @@ Route::get('/login', [LoginController::class, 'show'])->name('login');
 Route::post('/login', [LoginController::class, 'submit'])->name('login.submit');
 
 
+
+Route::get('/supervisor/email/{id}/approve', [SupervisorController::class, 'approveFromEmail'])
+    ->name('supervisor.email.approve');
+
+Route::get('/supervisor/email/{id}/block', [SupervisorController::class, 'blockFromEmail'])
+    ->name('supervisor.email.block');
+
 Route::get('/supervisor', [SupervisorController::class, 'index'])
     ->name('supervisor.index');
 
