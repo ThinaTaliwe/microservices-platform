@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Auth Gateway</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1">    @if(session("status"))        <meta http-equiv="refresh" content="5">    @endif
 
     <style>
         body {
@@ -102,7 +102,7 @@
     <main class="auth-card">
 
         <div class="my-2">
-            <h1 class="title">Auth Gateway</h1>
+            <h1 class="title">Auto Gateway</h1>
         </div>
 
         @if(session('success'))
@@ -136,9 +136,9 @@
             <button type="submit">Continue Securely</button>
         </form>
 
-        <div class="footnote">
+        {{-- <div class="footnote">
             Device and network details are captured for security review and supervisor approval when needed.
-        </div>
+        </div> --}}
     </main>
 
     <script>
@@ -147,5 +147,6 @@
         document.getElementById('platform').value = navigator.platform || '';
         document.getElementById('language').value = navigator.language || '';
     </script>
+
 </body>
 </html>

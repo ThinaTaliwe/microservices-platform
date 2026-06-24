@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\BfrnUserCreatedMail;
 use Illuminate\Support\Str;
 
 class SupervisorController extends Controller
@@ -54,6 +57,8 @@ class SupervisorController extends Controller
                 $approval->platform = $payload['platform'] ?? 'Unknown';
                 $approval->language = $payload['language'] ?? 'Unknown';
                 $approval->location = 'Johannesburg, ZA';
+                $approval->trusted = $approval->trusted ?? 0;
+
                 $approval->device_label = $approval->trusted
                     ? 'Known trusted device'
                     : 'New device';
@@ -141,20 +146,143 @@ class SupervisorController extends Controller
 
                 $identity = DB::table('auth_identities')
                     ->where('id', $approval->auth_identity_id)
-                    ->first(['id', 'bfrn_user_id']);
+                    ->first(['id', 'email_encrypted', 'bfrn_user_id']);
 
-                if ($identity && $identity->bfrn_user_id) {
-                    $handoffToken = Str::random(80);
-                    $handoffUrl = rtrim((string) env('BFRN_BASE_URL'), '/') . '/gateway-login?token=' . $handoffToken;
+                $temporaryPassword = null;
+                $createdBfrnUser = false;
 
-                    DB::table('auth_handoff_tokens')->insert([
-                        'auth_identity_id' => $identity->id,
-                        'bfrn_user_id' => $identity->bfrn_user_id,
-                        'token_hash' => hash_hmac('sha256', $handoffToken, env('AUTH_GATEWAY_HANDOFF_SECRET')),
-                        'expires_at' => now()->addMinutes((int) env('AUTH_GATEWAY_TOKEN_TTL_MINUTES', 5)),
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
+                if ($identity) {
+                    $email = null;
+
+                    try {
+                        $email = Crypt::decryptString($identity->email_encrypted);
+                    } catch (\Throwable $e) {
+                        $email = null;
+                    }
+
+                    if (!$identity->bfrn_user_id && $email) {
+                        $existingBfrnUser = DB::connection('bfrn_mysql')
+                            ->table('users')
+                            ->where('email', $email)
+                            ->first(['id']);
+
+                        if ($existingBfrnUser) {
+                            $identity->bfrn_user_id = $existingBfrnUser->id;
+
+                            DB::table('auth_identities')
+                                ->where('id', $identity->id)
+                                ->update([
+                                    'bfrn_user_id' => $existingBfrnUser->id,
+                                    'updated_at' => now(),
+                                ]);
+                        } else {
+                            $temporaryPassword = Str::password(14);
+
+                            $bfrnUserId = DB::connection('bfrn_mysql')
+                                ->table('users')
+                                ->insertGetId([
+                                    'name' => $email,
+                                    'email' => $email,
+                                    'email_verified_at' => now(),
+                                    'password' => Hash::make($temporaryPassword),
+                                    'welcome_valid_until' => now()->addYear(),
+                                    'created_at' => now(),
+                                    'updated_at' => now(),
+                                ]);
+
+                            $defaultBuId = (int) env('BFRN_DEFAULT_BU_ID', 8);
+
+                            $bu = DB::connection('bfrn_mysql')
+                                ->table('bu')
+                                ->where('id', $defaultBuId)
+                                ->first(['id', 'system_id']);
+
+                            if ($bu) {
+                                DB::connection('bfrn_mysql')->table('users_has_bu')->insert([
+                                    'users_id' => $bfrnUserId,
+                                    'bu_id' => $bu->id,
+                                    'requested' => 0,
+                                    'has_access' => 1,
+                                    'created_at' => now(),
+                                    'updated_at' => now(),
+                                ]);
+
+                                DB::connection('bfrn_mysql')->table('user_has_system')->insert([
+                                    'users_id' => $bfrnUserId,
+                                    'system_id' => $bu->system_id,
+                                    'full_access' => 1,
+                                    'system_size' => 'S',
+                                    'company_id' => null,
+                                    'bu_id' => $bu->id,
+                                    'component_id' => null,
+                                    'created_at' => now(),
+                                    'updated_at' => now(),
+                                ]);
+                            }
+
+                            $identity->bfrn_user_id = $bfrnUserId;
+                            $createdBfrnUser = true;
+
+                            DB::table('auth_identities')
+                                ->where('id', $identity->id)
+                                ->update([
+                                    'bfrn_user_id' => $bfrnUserId,
+                                    'updated_at' => now(),
+                                ]);
+
+                            $baseDetails = [
+                                'email' => $email,
+                                'password' => $temporaryPassword,
+                                'bfrn_user_id' => $bfrnUserId,
+                                'auth_gateway_url' => rtrim((string) env('APP_URL'), '/'),
+                                'bfrn_login_url' => rtrim((string) env('BFRN_BASE_URL'), '/') . '/bfrn/login',
+                            ];
+
+                            try {
+                                Mail::to($email)->send(new BfrnUserCreatedMail(array_merge($baseDetails, [
+                                    'show_password' => true,
+                                ])));
+
+                                $supervisors = collect(explode(',', (string) env('AUTH_GATEWAY_SUPERVISORS')))
+                                    ->map(fn ($email) => trim($email))
+                                    ->filter()
+                                    ->unique();
+
+                                foreach ($supervisors as $supervisorEmail) {
+                                    Mail::to($supervisorEmail)->send(new BfrnUserCreatedMail(array_merge($baseDetails, [
+                                        'show_password' => false,
+                                    ])));
+                                }
+                            } catch (\Throwable $e) {
+                                DB::table('auth_security_events')->insert([
+                                    'auth_identity_id' => $identity->id,
+                                    'login_attempt_id' => $approval->login_attempt_id,
+                                    'event' => 'bfrn_credentials_email_failed',
+                                    'payload_encrypted' => Crypt::encryptString(json_encode([
+                                        'email' => $email,
+                                        'error' => $e->getMessage(),
+                                        'failed_at' => now()->toDateTimeString(),
+                                    ])),
+                                    'created_at' => now(),
+                                    'updated_at' => now(),
+                                ]);
+                            }
+                        }
+                    }
+
+                    if ($identity->bfrn_user_id) {
+                        $handoffToken = Str::random(80);
+                        $handoffUrl = rtrim((string) env('BFRN_BASE_URL'), '/') . '/bfrn/gateway-login?token=' . $handoffToken;
+
+                        DB::table('auth_handoff_tokens')->insert([
+                            'auth_identity_id' => $identity->id,
+                            'bfrn_user_id' => $identity->bfrn_user_id,
+                            'token_hash' => hash_hmac('sha256', $handoffToken, env('AUTH_GATEWAY_HANDOFF_SECRET')),
+                            'expires_at' => now()->addMinutes((int) env('AUTH_GATEWAY_TOKEN_TTL_MINUTES', 5)),
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
                 }
             }
 

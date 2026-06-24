@@ -6,18 +6,16 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 
-class SupervisorLoginApprovalMail extends Mailable
+class BfrnUserCreatedMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public function __construct(
-        public array $details
-    ) {}
+    public function __construct(public array $details) {}
 
     public function build()
     {
-        return $this->subject('Risky Login Approval Required')
-            ->view('emails.auth-gateway.supervisor-login-approval')
+        return $this->subject('BFRN Access Created')
+            ->view('emails.auth-gateway.bfrn-user-created')
             ->with(['details' => $this->details]);
     }
 }

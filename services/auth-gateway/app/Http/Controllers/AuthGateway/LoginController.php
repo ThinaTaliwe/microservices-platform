@@ -203,11 +203,20 @@ class LoginController extends Controller
                 ]);
 
                 Mail::to($supervisorEmail)->send(new SupervisorLoginApprovalMail([
-                    'masked_email' => preg_replace('/(^.).*(@.*$)/', '$1***$2', $email),
-                    'device' => $knownTrustedDevice ? 'Known device' : 'New device',
+                    'email' => $email,
+                    'masked_email' => $email,
+                    'device' => $knownTrustedDevice ? 'Known trusted device' : 'New device',
                     'location' => 'Johannesburg, ZA',
                     'risk' => ucfirst($riskLevel),
                     'reason' => $decisionReason,
+                    'ip' => $ip ?? 'Unknown',
+                    'platform' => $validated['platform'] ?? 'Unknown',
+                    'screen' => $validated['screen'] ?? 'Unknown',
+                    'timezone' => $validated['timezone'] ?? 'Unknown',
+                    'language' => $validated['language'] ?? 'Unknown',
+                    'browser' => $userAgent ?? 'Unknown',
+                    'bfrn_user_id' => $bfrnUser->id ?? 'Not linked',
+                    'attempt_time' => now()->toDateTimeString(),
                     'supervisor_url' => rtrim((string) env('APP_URL'), '/') . '/supervisor?approval=' . $approvalId,
                     'approve_url' => rtrim((string) env('APP_URL'), '/') . '/supervisor/email/' . $approvalId . '/approve?token=' . urlencode($approvalToken),
                     'block_url' => rtrim((string) env('APP_URL'), '/') . '/supervisor/email/' . $approvalId . '/block?token=' . urlencode($approvalToken),
