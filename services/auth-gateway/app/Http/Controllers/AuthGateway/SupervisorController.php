@@ -22,6 +22,7 @@ class SupervisorController extends Controller
                 'a.id',
                 'a.login_attempt_id',
                 'a.status',
+                'a.approved_bu_id',
                 'a.expires_at',
                 'a.created_at',
                 'l.risk_level',
@@ -73,12 +74,22 @@ class SupervisorController extends Controller
             'expired' => $approvals->where('status', 'expired')->count(),
         ];
 
-        return view('auth-gateway.supervisor.index', compact('approvals', 'summary'));
+        $businessUnits = DB::connection('bfrn_mysql')
+            ->table('bu')
+            ->select('id', 'bu_name', 'short_code', 'system_id')
+            ->orderBy('bu_name')
+            ->get();
+
+        return view('auth-gateway.supervisor.index', compact('approvals', 'summary', 'businessUnits'));
     }
 
     public function approve(Request $request, int $id)
     {
-        return $this->decide($id, 'approved', 'Supervisor approved login request.');
+        $request->validate([
+            'approved_bu_id' => ['nullable', 'integer'],
+        ]);
+
+        return $this->decide($id, 'approved', 'Supervisor approved login request.', $request->integer('approved_bu_id') ?: null);
     }
 
     public function block(Request $request, int $id)
@@ -86,7 +97,7 @@ class SupervisorController extends Controller
         return $this->decide($id, 'blocked', 'Supervisor blocked login request.');
     }
 
-    private function decide(int $id, string $status, string $reason)
+    private function decide(int $id, string $status, string $reason, ?int $approvedBuId = null)
     {
         $approval = DB::table('auth_pending_approvals')->where('id', $id)->first();
 
@@ -109,11 +120,12 @@ class SupervisorController extends Controller
             return back()->with('error', 'This approval request has expired.');
         }
 
-        DB::transaction(function () use ($approval, $id, $status, $reason) {
+        DB::transaction(function () use ($approval, $id, $status, $reason, $approvedBuId) {
             DB::table('auth_pending_approvals')
                 ->where('id', $id)
                 ->update([
                     'status' => $status,
+                    'approved_bu_id' => $approvedBuId,
                     'decided_at' => now(),
                     'updated_at' => now(),
                 ]);
@@ -191,7 +203,7 @@ class SupervisorController extends Controller
                                     'updated_at' => now(),
                                 ]);
 
-                            $defaultBuId = (int) env('BFRN_DEFAULT_BU_ID', 8);
+                            $defaultBuId = $approvedBuId ?: (int) env('BFRN_DEFAULT_BU_ID', 8);
 
                             $bu = DB::connection('bfrn_mysql')
                                 ->table('bu')
@@ -345,7 +357,7 @@ class SupervisorController extends Controller
             ? 'Supervisor approved login request from email.'
             : 'Supervisor blocked login request from email.';
 
-        return $this->decide($id, $status, $reason);
+        return $this->decide($id, $status, $reason, (int) ($approval->approved_bu_id ?: env('BFRN_DEFAULT_BU_ID', 8)));
     }
 
 

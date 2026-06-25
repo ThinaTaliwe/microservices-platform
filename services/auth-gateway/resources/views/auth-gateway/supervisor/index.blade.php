@@ -13,9 +13,9 @@
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 
-<body style="margin:0; font-family:Arial, sans-serif; background:#f3f4f6; color:#111827;">
+<body style="margin:0; padding:2em; font-family:Arial, sans-serif; background:#f3f4f6; color:#111827;">
 
-<div style="max-width:1180px; margin:0 auto; padding:32px 20px;">
+<div style="padding:32px 20px;">
     <header style="margin-bottom:24px;">
         <h1 style="margin:0; font-size:28px; font-weight:800;">Supervisor Review Queue</h1>
         <p style="margin:8px 0 0; color:#6b7280; font-size:14px;">
@@ -56,7 +56,7 @@
             <thead style="background:#f9fafb; color:#374151;">
                 <tr>
                     <th style="text-align:left; padding:14px 16px;">ID</th>
-                    <th style="text-align:left; padding:14px 16px;">Risk</th>
+                    {{-- <th style="text-align:left; padding:14px 16px;">Risk</th> --}}
                     <th style="text-align:left; padding:14px 16px;">Status</th>
                     <th style="text-align:left; padding:14px 16px;">Login Details</th>
                     <th style="text-align:left; padding:14px 16px;">Expires</th>
@@ -69,11 +69,11 @@
                     <tr id="approval-{{ $approval->id }}" style="border-top:1px solid #e5e7eb; {{ request('approval') == $approval->id ? 'background:#eff6ff;' : '' }}">
                         <td style="padding:14px 16px; font-weight:700;">{{ $approval->id }}</td>
 
-                        <td style="padding:14px 16px;">
+                        {{-- <td style="padding:14px 16px;">
                             <span style="display:inline-flex; padding:5px 9px; border-radius:999px; background:#fff7ed; color:#c2410c; font-size:12px; font-weight:800;">
                                 {{ strtoupper($approval->risk_level) }}
                             </span>
-                        </td>
+                        </td> --}}
 
                         <td style="padding:14px 16px;">
                             @php
@@ -121,12 +121,27 @@
                                 <div style="display:flex; justify-content:flex-end; gap:8px;">
                                     <form method="POST" action="/supervisor/{{ $approval->id }}/approve" onsubmit="return confirm('Approve this login request?');">
                                         @csrf
-                                        <button
-                                            type="submit"
-                                            style="border:0; background:#059669; color:#fff; padding:9px 12px; border-radius:9px; font-weight:800; cursor:pointer;"
-                                        >
-                                            Approve
-                                        </button>
+
+                                        <div style="display:flex; gap:8px; align-items:center; justify-content:flex-end; flex-wrap:nowrap;">
+                                            <select
+                                                name="approved_bu_id"
+                                                title="Select business unit before approval"
+                                                style="padding:9px 12px; border:1px solid #cbd5e1; border-radius:10px; width:auto; max-width:350px; background:#ffffff; font-weight:700; color:#111827;"
+                                            >
+                                                @foreach($businessUnits as $businessUnit)
+                                                    <option value="{{ $businessUnit->id }}" @selected((int)($approval->approved_bu_id ?? 8) === (int)$businessUnit->id)>
+                                                        {{ $businessUnit->bu_name }} ({{ $businessUnit->short_code }})
+                                                    </option>
+                                                @endforeach
+                                            </select>
+
+                                            <button
+                                                type="submit"
+                                                style="border:0; background:#059669; color:#fff; padding:8px 12px; border-radius:10px; font-weight:900; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,.12);"
+                                            >
+                                                Approve
+                                            </button>
+                                        </div>
                                     </form>
 
                                     <form method="POST" action="/supervisor/{{ $approval->id }}/block" onsubmit="return confirm('Block this login request?');">
@@ -140,7 +155,7 @@
                                     </form>
                                 </div>
                             @else
-                                <span style="color:#9ca3af; font-size:13px;">Decided</span>
+                                <span style="color:#8a9091; font-size:13px;">Decided</span>
                             @endif
                         </td>
                     </tr>
