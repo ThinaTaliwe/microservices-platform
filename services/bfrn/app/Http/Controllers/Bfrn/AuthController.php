@@ -55,10 +55,8 @@ class AuthController extends Controller
 
         $businessUnits = $this->userBusinessUnits(Auth::id());
 
-        $preferredBusinessUnit = $businessUnits->firstWhere('id', 8) ?: $businessUnits->first();
-
-        if ($preferredBusinessUnit) {
-            $this->setActiveBusinessUnit($request, $preferredBusinessUnit);
+        if ($businessUnits->count() === 1) {
+            $this->setActiveBusinessUnit($request, $businessUnits->first());
             return $this->redirectRelative('/bfrn/operations/dashboard');
         }
 
@@ -129,10 +127,8 @@ class AuthController extends Controller
             ]);
 
         $businessUnits = $this->userBusinessUnits(Auth::id());
-        $preferredBusinessUnit = $businessUnits->firstWhere('id', 8) ?: $businessUnits->first();
-
-        if ($preferredBusinessUnit) {
-            $this->setActiveBusinessUnit($request, $preferredBusinessUnit);
+        if ($businessUnits->count() === 1) {
+            $this->setActiveBusinessUnit($request, $businessUnits->first());
             return $this->redirectRelative('/bfrn/operations/dashboard');
         }
 
