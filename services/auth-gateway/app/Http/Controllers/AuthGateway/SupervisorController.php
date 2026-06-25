@@ -185,6 +185,7 @@ class SupervisorController extends Controller
                                     'email' => $email,
                                     'email_verified_at' => now(),
                                     'password' => Hash::make($temporaryPassword),
+                                    'must_change_password' => 1,
                                     'welcome_valid_until' => now()->addYear(),
                                     'created_at' => now(),
                                     'updated_at' => now(),

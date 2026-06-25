@@ -134,6 +134,14 @@ Route::prefix('bfrn')->name('bfrn.')->group(function () {
         ->middleware('auth')
         ->name('auth.logout');
 
+    Route::get('/password/change', [AuthController::class, 'showChangePassword'])
+        ->middleware('auth')
+        ->name('auth.password.change');
+
+    Route::post('/password/change', [AuthController::class, 'updateChangePassword'])
+        ->middleware('auth')
+        ->name('auth.password.update');
+
     Route::get('/select-business-unit', [AuthController::class, 'showBusinessUnitSelect'])
         ->middleware('auth')
         ->name('auth.bu.select');

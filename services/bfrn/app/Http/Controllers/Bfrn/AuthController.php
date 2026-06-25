@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
@@ -46,6 +47,10 @@ class AuthController extends Controller
             return back()->withErrors([
                 'email' => 'This user account is disabled or expired.',
             ])->onlyInput('email');
+        }
+
+        if ((int) ($user->must_change_password ?? 0) === 1) {
+            return $this->redirectRelative('/bfrn/password/change');
         }
 
         $businessUnits = $this->userBusinessUnits(Auth::id());
@@ -102,6 +107,36 @@ class AuthController extends Controller
         }
 
         return $this->redirectRelative('/bfrn/operations/dashboard');
+    }
+
+    public function showChangePassword()
+    {
+        return view('bfrn.auth.change-password');
+    }
+
+    public function updateChangePassword(Request $request)
+    {
+        $data = $request->validate([
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        DB::table('users')
+            ->where('id', Auth::id())
+            ->update([
+                'password' => Hash::make($data['password']),
+                'must_change_password' => 0,
+                'updated_at' => now(),
+            ]);
+
+        $businessUnits = $this->userBusinessUnits(Auth::id());
+        $preferredBusinessUnit = $businessUnits->firstWhere('id', 8) ?: $businessUnits->first();
+
+        if ($preferredBusinessUnit) {
+            $this->setActiveBusinessUnit($request, $preferredBusinessUnit);
+            return $this->redirectRelative('/bfrn/operations/dashboard');
+        }
+
+        return $this->redirectRelative('/bfrn/select-business-unit');
     }
 
     public function logout(Request $request)
