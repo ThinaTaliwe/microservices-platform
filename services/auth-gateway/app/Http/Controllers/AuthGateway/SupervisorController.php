@@ -120,7 +120,9 @@ class SupervisorController extends Controller
             return back()->with('error', 'This approval request has expired.');
         }
 
-        DB::transaction(function () use ($approval, $id, $status, $reason, $approvedBuId) {
+        $mailPayload = null;
+
+        DB::transaction(function () use ($approval, $id, $status, $reason, $approvedBuId, &$mailPayload) {
             DB::table('auth_pending_approvals')
                 ->where('id', $id)
                 ->update([
@@ -243,43 +245,14 @@ class SupervisorController extends Controller
                                     'updated_at' => now(),
                                 ]);
 
-                            $baseDetails = [
+                            $mailPayload = [
+                                'identity_id' => $identity->id,
+                                'login_attempt_id' => $approval->login_attempt_id,
                                 'email' => $email,
-                                'password' => $temporaryPassword,
+                                'temporary_password' => $temporaryPassword,
                                 'bfrn_user_id' => $bfrnUserId,
-                                'auth_gateway_url' => rtrim((string) env('APP_URL'), '/'),
-                                'bfrn_login_url' => rtrim((string) env('BFRN_BASE_URL'), '/') . '/bfrn/login',
                             ];
 
-                            try {
-                                Mail::to($email)->send(new BfrnUserCreatedMail(array_merge($baseDetails, [
-                                    'show_password' => true,
-                                ])));
-
-                                $supervisors = collect(explode(',', (string) env('AUTH_GATEWAY_SUPERVISORS')))
-                                    ->map(fn ($email) => trim($email))
-                                    ->filter()
-                                    ->unique();
-
-                                foreach ($supervisors as $supervisorEmail) {
-                                    Mail::to($supervisorEmail)->send(new BfrnUserCreatedMail(array_merge($baseDetails, [
-                                        'show_password' => false,
-                                    ])));
-                                }
-                            } catch (\Throwable $e) {
-                                DB::table('auth_security_events')->insert([
-                                    'auth_identity_id' => $identity->id,
-                                    'login_attempt_id' => $approval->login_attempt_id,
-                                    'event' => 'bfrn_credentials_email_failed',
-                                    'payload_encrypted' => Crypt::encryptString(json_encode([
-                                        'email' => $email,
-                                        'error' => $e->getMessage(),
-                                        'failed_at' => now()->toDateTimeString(),
-                                    ])),
-                                    'created_at' => now(),
-                                    'updated_at' => now(),
-                                ]);
-                            }
                         }
                     }
 
@@ -315,6 +288,47 @@ class SupervisorController extends Controller
                 'updated_at' => now(),
             ]);
         });
+
+        if ($mailPayload) {
+            try {
+                $baseDetails = [
+                    'email' => $mailPayload['email'],
+                    'password' => $mailPayload['temporary_password'],
+                    'bfrn_user_id' => $mailPayload['bfrn_user_id'],
+                    'auth_gateway_url' => rtrim((string) env('APP_URL'), '/'),
+                    'bfrn_login_url' => rtrim((string) env('BFRN_BASE_URL'), '/') . '/bfrn/login',
+                ];
+
+                $this->sendMailWithRetry($mailPayload['email'], new BfrnUserCreatedMail(array_merge($baseDetails, [
+                    'show_password' => true,
+                ])));
+
+                $supervisors = collect(explode(',', (string) env('AUTH_GATEWAY_SUPERVISORS')))
+                    ->map(fn ($email) => trim($email))
+                    ->filter()
+                    ->unique();
+
+                foreach ($supervisors as $supervisorEmail) {
+                    $this->sendMailWithRetry($supervisorEmail, new BfrnUserCreatedMail(array_merge($baseDetails, [
+                        'show_password' => false,
+                    ])));
+                }
+            } catch (\Throwable $e) {
+                DB::table('auth_security_events')->insert([
+                    'auth_identity_id' => $mailPayload['identity_id'],
+                    'login_attempt_id' => $mailPayload['login_attempt_id'],
+                    'event' => 'bfrn_credentials_email_failed',
+                    'payload_encrypted' => Crypt::encryptString(json_encode([
+                        'email' => $mailPayload['email'],
+                        'error' => $e->getMessage(),
+                        'failed_at' => now()->toDateTimeString(),
+                    ])),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        }
+
 
         return back()->with('success', $reason);
     }
@@ -360,5 +374,24 @@ class SupervisorController extends Controller
         return $this->decide($id, $status, $reason, (int) ($approval->approved_bu_id ?: env('BFRN_DEFAULT_BU_ID', 8)));
     }
 
+
+
+
+    private function sendMailWithRetry(string $email, $mailable): void
+    {
+        $lastException = null;
+
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            try {
+                Mail::to($email)->send($mailable);
+                return;
+            } catch (\Throwable $e) {
+                $lastException = $e;
+                sleep(2);
+            }
+        }
+
+        throw $lastException;
+    }
 
 }

@@ -202,7 +202,7 @@ class LoginController extends Controller
                     'updated_at' => now(),
                 ]);
 
-                Mail::to($supervisorEmail)->send(new SupervisorLoginApprovalMail([
+                $this->sendMailWithRetry($supervisorEmail, new SupervisorLoginApprovalMail([
                     'email' => $email,
                     'masked_email' => $email,
                     'device' => $knownTrustedDevice ? 'Known trusted device' : 'New device',
@@ -256,4 +256,23 @@ class LoginController extends Controller
 
         return back()->with('success', 'Login request captured for supervisor review.');
     }
+
+
+    private function sendMailWithRetry(string $email, $mailable): void
+    {
+        $lastException = null;
+
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            try {
+                Mail::to($email)->send($mailable);
+                return;
+            } catch (\Throwable $e) {
+                $lastException = $e;
+                sleep(2);
+            }
+        }
+
+        throw $lastException;
+    }
+
 }
