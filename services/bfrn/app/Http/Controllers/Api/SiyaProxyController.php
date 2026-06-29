@@ -352,7 +352,7 @@ class SiyaProxyController extends Controller
     {
         $url = $this->url('/api/loading/loading-items/');
         $res = $this->client($request)->get($url, $request->query());
-        return $this->passthrough($res);
+        return $this->filteredParentItemResponse($request, $res, 'loading', '/api/loading/loadings/');
     }
 
     public function movements(Request $request)
@@ -371,7 +371,7 @@ class SiyaProxyController extends Controller
     {
         $url = $this->url('/api/movement/movement-items/');
         $res = $this->client($request)->get($url, $request->query());
-        return $this->passthrough($res);
+        return $this->filteredParentItemResponse($request, $res, 'movement', '/api/movement/movements/');
     }
 
     public function offloadings(Request $request)
@@ -390,7 +390,7 @@ class SiyaProxyController extends Controller
     {
         $url = $this->url('/api/movement/offloading-items/');
         $res = $this->client($request)->get($url, $request->query());
-        return $this->passthrough($res);
+        return $this->filteredParentItemResponse($request, $res, 'offloading', '/api/movement/offloadings/');
     }
 
     public function storage(Request $request)
@@ -409,7 +409,43 @@ class SiyaProxyController extends Controller
     {
         $url = $this->url('/api/storage/storage-items/');
         $res = $this->client($request)->get($url, $request->query());
-        return $this->passthrough($res);
+        return $this->filteredParentItemResponse($request, $res, 'storage', '/api/storage/storage/');
+    }
+
+    private function parentRecordBelongsToActiveBu(Request $request, string $parentEndpoint, int $parentId): bool
+    {
+        $url = $this->url(rtrim($parentEndpoint, '/') . "/{$parentId}/");
+        $res = $this->client($request)->get($url);
+
+        if (!$res->successful()) {
+            return false;
+        }
+
+        $parent = $res->json() ?? [];
+
+        return (int) ($parent['bu'] ?? $parent['bu_id'] ?? 0) === $this->activeBuId();
+    }
+
+    private function filteredParentItemResponse(Request $request, $res, string $parentField, string $parentEndpoint)
+    {
+        $json = $res->json();
+
+        if (!is_array($json)) {
+            return $this->passthrough($res);
+        }
+
+        $filter = function ($row) use ($request, $parentField, $parentEndpoint) {
+            return is_array($row)
+                && !empty($row[$parentField])
+                && $this->parentRecordBelongsToActiveBu($request, $parentEndpoint, (int) $row[$parentField]);
+        };
+
+        if (isset($json['results']) && is_array($json['results'])) {
+            $json['results'] = collect($json['results'])->filter($filter)->values()->all();
+            return response()->json($json, $res->status());
+        }
+
+        return response()->json(collect($json)->filter($filter)->values()->all(), $res->status());
     }
 
     public function modesOfTransport(Request $request)
@@ -610,6 +646,6 @@ class SiyaProxyController extends Controller
     {
         $url = $this->url('/api/shipments/shipment-items/');
         $res = $this->client($request)->get($url, $request->query());
-        return $this->passthrough($res);
+        return $this->filteredParentItemResponse($request, $res, 'shipment', '/api/shipments/shipments/');
     }
 }
