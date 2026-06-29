@@ -57,6 +57,31 @@ class SiyaProxyController extends Controller
         return (int) ($address['bu'] ?? $address['bu_id'] ?? 0) === $this->activeBuId();
     }
 
+    private function filteredActiveBuResponse($res)
+    {
+        $json = $res->json();
+
+        if (!is_array($json)) {
+            return $this->passthrough($res);
+        }
+
+        if (isset($json['results']) && is_array($json['results'])) {
+            $json['results'] = collect($json['results'])
+                ->filter(fn ($row) => is_array($row) && (int) ($row['bu'] ?? $row['bu_id'] ?? 0) === $this->activeBuId())
+                ->values()
+                ->all();
+
+            return response()->json($json, $res->status());
+        }
+
+        $json = collect($json)
+            ->filter(fn ($row) => is_array($row) && (int) ($row['bu'] ?? $row['bu_id'] ?? 0) === $this->activeBuId())
+            ->values()
+            ->all();
+
+        return response()->json($json, $res->status());
+    }
+
     private function passthrough($res)
     {
         // Return JSON if possible; otherwise return raw
@@ -263,8 +288,13 @@ class SiyaProxyController extends Controller
     public function loadings(Request $request)
     {
         $url = $this->url('/api/loading/loadings/');
-        $res = $this->client($request)->get($url, $request->query());
-        return $this->passthrough($res);
+        $query = array_merge($request->query(), [
+            'bu' => $this->activeBuId(),
+            'bu_id' => $this->activeBuId(),
+        ]);
+
+        $res = $this->client($request)->get($url, $query);
+        return $this->filteredActiveBuResponse($res);
     }
 
     public function loadingItems(Request $request)
@@ -277,8 +307,13 @@ class SiyaProxyController extends Controller
     public function movements(Request $request)
     {
         $url = $this->url('/api/movement/movements/');
-        $res = $this->client($request)->get($url, $request->query());
-        return $this->passthrough($res);
+        $query = array_merge($request->query(), [
+            'bu' => $this->activeBuId(),
+            'bu_id' => $this->activeBuId(),
+        ]);
+
+        $res = $this->client($request)->get($url, $query);
+        return $this->filteredActiveBuResponse($res);
     }
 
     public function movementItems(Request $request)
@@ -291,8 +326,13 @@ class SiyaProxyController extends Controller
     public function offloadings(Request $request)
     {
         $url = $this->url('/api/movement/offloadings/');
-        $res = $this->client($request)->get($url, $request->query());
-        return $this->passthrough($res);
+        $query = array_merge($request->query(), [
+            'bu' => $this->activeBuId(),
+            'bu_id' => $this->activeBuId(),
+        ]);
+
+        $res = $this->client($request)->get($url, $query);
+        return $this->filteredActiveBuResponse($res);
     }
 
     public function offloadingItems(Request $request)
@@ -305,8 +345,13 @@ class SiyaProxyController extends Controller
     public function storage(Request $request)
     {
         $url = $this->url('/api/storage/storage/');
-        $res = $this->client($request)->get($url, $request->query());
-        return $this->passthrough($res);
+        $query = array_merge($request->query(), [
+            'bu' => $this->activeBuId(),
+            'bu_id' => $this->activeBuId(),
+        ]);
+
+        $res = $this->client($request)->get($url, $query);
+        return $this->filteredActiveBuResponse($res);
     }
 
     public function storageItems(Request $request)
