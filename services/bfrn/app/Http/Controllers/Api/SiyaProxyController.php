@@ -82,6 +82,24 @@ class SiyaProxyController extends Controller
         return response()->json($json, $res->status());
     }
 
+    private function assertShipmentBelongsToActiveBu(Request $request, int $shipmentId)
+    {
+        $shipmentUrl = $this->url("/api/shipments/shipments/{$shipmentId}/");
+        $shipmentRes = $this->client($request)->get($shipmentUrl);
+
+        if (!$shipmentRes->successful()) {
+            return response()->json(['message' => 'Shipment not found.'], $shipmentRes->status());
+        }
+
+        $shipment = $shipmentRes->json() ?? [];
+
+        if ((int) ($shipment['bu'] ?? 0) !== $this->activeBuId()) {
+            return response()->json(['message' => 'You do not have access to this shipment for the selected business unit.'], 403);
+        }
+
+        return null;
+    }
+
     private function passthrough($res)
     {
         // Return JSON if possible; otherwise return raw
@@ -377,6 +395,10 @@ class SiyaProxyController extends Controller
 
     public function shipmentDocumentsIndex(Request $request, $shipmentId)
     {
+        if ($blocked = $this->assertShipmentBelongsToActiveBu($request, (int) $shipmentId)) {
+            return $blocked;
+        }
+
         $url = $this->url("/api/shipments/shipments/{$shipmentId}/documents/");
         $res = $this->client($request)->get($url, $request->query());
         return $this->passthrough($res);
@@ -384,6 +406,10 @@ class SiyaProxyController extends Controller
 
     public function shipmentDocumentsStore(Request $request, $shipmentId)
     {
+        if ($blocked = $this->assertShipmentBelongsToActiveBu($request, (int) $shipmentId)) {
+            return $blocked;
+        }
+
         $url = $this->url("/api/shipments/shipments/{$shipmentId}/documents/");
 
         $http = $this->client($request);
@@ -423,6 +449,10 @@ class SiyaProxyController extends Controller
 
     public function shipmentDocumentsDestroy(Request $request, $shipmentId, $filename)
     {
+        if ($blocked = $this->assertShipmentBelongsToActiveBu($request, (int) $shipmentId)) {
+            return $blocked;
+        }
+
         $encodedFilename = implode('/', array_map('rawurlencode', explode('/', $filename)));
 
         $url = $this->url("/api/shipments/shipments/{$shipmentId}/documents/{$encodedFilename}");
@@ -477,6 +507,10 @@ class SiyaProxyController extends Controller
 
     public function shipmentDocumentsDestroyByQuery(Request $request, $shipmentId)
     {
+        if ($blocked = $this->assertShipmentBelongsToActiveBu($request, (int) $shipmentId)) {
+            return $blocked;
+        }
+
         $filename = $request->query('filename');
 
         if (!$filename) {
