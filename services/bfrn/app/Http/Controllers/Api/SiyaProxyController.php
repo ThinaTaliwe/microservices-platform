@@ -100,6 +100,39 @@ class SiyaProxyController extends Controller
         return null;
     }
 
+    private function filteredShipmentRelationshipResponse(Request $request, $res)
+    {
+        $json = $res->json();
+
+        if (!is_array($json)) {
+            return $this->passthrough($res);
+        }
+
+        $filter = function ($row) use ($request) {
+            if (!is_array($row)) {
+                return false;
+            }
+
+            foreach (['parent_shipment', 'child_shipment', 'shipment', 'previous_shipment'] as $field) {
+                if (!empty($row[$field])) {
+                    if ($this->assertShipmentBelongsToActiveBu($request, (int) $row[$field]) === null) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        };
+
+        if (isset($json['results']) && is_array($json['results'])) {
+            $json['results'] = collect($json['results'])->filter($filter)->values()->all();
+            return response()->json($json, $res->status());
+        }
+
+        $json = collect($json)->filter($filter)->values()->all();
+        return response()->json($json, $res->status());
+    }
+
     private function passthrough($res)
     {
         // Return JSON if possible; otherwise return raw
@@ -481,20 +514,30 @@ class SiyaProxyController extends Controller
     {
         $url = $this->url('/api/shipments/shipment-has-shipment/');
         $res = $this->client($request)->get($url, $request->query());
-        return $this->passthrough($res);
+        return $this->filteredShipmentRelationshipResponse($request, $res);
     }
 
     public function previousShipmentRelationships(Request $request)
     {
         $url = $this->url('/api/shipments/shipment-has-previous-shipments/');
         $res = $this->client($request)->get($url, $request->query());
-        return $this->passthrough($res);
+        return $this->filteredShipmentRelationshipResponse($request, $res);
     }
 
     public function shipmentInstructionShow(Request $request, $id)
     {
         $url = $this->url("/api/shipments/shipment-instructions/{$id}/");
         $res = $this->client($request)->get($url, $request->query());
+
+        if ($res->successful()) {
+            $instruction = $res->json() ?? [];
+            $instructionBu = (int) ($instruction['bu'] ?? $instruction['bu_id'] ?? 0);
+
+            if ($instructionBu !== $this->activeBuId()) {
+                return response()->json(['message' => 'You do not have access to this shipment instruction for the selected business unit.'], 403);
+            }
+        }
+
         return $this->passthrough($res);
     }
 
@@ -502,7 +545,7 @@ class SiyaProxyController extends Controller
     {
         $url = $this->url('/api/shipments/shipment-has-shipment/');
         $res = $this->client($request)->get($url, $request->query());
-        return $this->passthrough($res);
+        return $this->filteredShipmentRelationshipResponse($request, $res);
     }
 
     public function shipmentDocumentsDestroyByQuery(Request $request, $shipmentId)
@@ -543,9 +586,24 @@ class SiyaProxyController extends Controller
 
     public function shipmentRelationshipDestroy(Request $request, $id)
     {
-        $url = $this->url("/api/shipments/shipment-has-shipment/{$id}/");
-        $res = $this->client($request)->delete($url);
-        return $this->passthrough($res);
+        $showUrl = $this->url("/api/shipments/shipment-has-shipment/{$id}/");
+        $relationshipRes = $this->client($request)->get($showUrl);
+
+        if ($relationshipRes->successful()) {
+            $relationship = $relationshipRes->json() ?? [];
+
+            foreach (['parent_shipment', 'child_shipment'] as $field) {
+                if (!empty($relationship[$field]) && $this->assertShipmentBelongsToActiveBu($request, (int) $relationship[$field]) === null) {
+                    $url = $this->url("/api/shipments/shipment-has-shipment/{$id}/");
+                    $res = $this->client($request)->delete($url);
+                    return $this->passthrough($res);
+                }
+            }
+
+            return response()->json(['message' => 'You do not have access to this shipment relationship for the selected business unit.'], 403);
+        }
+
+        return $this->passthrough($relationshipRes);
     }
 
     public function shipmentItemsIndex(Request $request)
