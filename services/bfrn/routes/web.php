@@ -5,6 +5,7 @@ use App\Http\Controllers\ShipmentWebController;
 use App\Http\Controllers\Api\SiyaProxyController;
 use App\Http\Controllers\ApiHealthController;
 use App\Http\Controllers\Bfrn\OperationsFlowController;
+use App\Http\Controllers\Bfrn\AddressController;
 use App\Http\Controllers\Bfrn\OperationsDashboardController;
 use App\Http\Controllers\Bfrn\AuthController;
 use App\Http\Controllers\Bfrn\GatewayLoginController;
@@ -174,6 +175,11 @@ Route::prefix('bfrn')->name('bfrn.')->group(function () {
     Route::get('/operations/dashboard.', function () {
         return redirect()->route('bfrn.operations.dashboard');
     });
+
+
+    Route::get('/operations/addresses', [AddressController::class, 'index'])
+        ->middleware(\App\Http\Middleware\EnsureBfrnComponentPermission::class . ':ship,read')
+        ->name('operations.addresses.index');
 
 
     Route::get('/operations/flows', [OperationsFlowController::class, 'index'])
