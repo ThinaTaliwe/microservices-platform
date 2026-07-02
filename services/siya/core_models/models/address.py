@@ -27,6 +27,10 @@ class Address(models.Model):
     customer = models.ForeignKey("core_models.Customer", on_delete=models.DO_NOTHING, blank=True, null=True)
 
     bu = models.ForeignKey("core_models.Bu", on_delete=models.DO_NOTHING, blank=True, null=True)
+
+    latitude = models.DecimalField(max_digits=10, decimal_places=7, blank=True, null=True)
+    longitude = models.DecimalField(max_digits=10, decimal_places=7, blank=True, null=True)
+
     company = models.ForeignKey("core_models.Company", on_delete=models.DO_NOTHING, blank=True, null=True)
 
     created_at = models.DateTimeField(blank=True, null=True)

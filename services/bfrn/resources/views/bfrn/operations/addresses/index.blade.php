@@ -146,6 +146,16 @@
                             <label class="form-label fw-semibold">District</label>
                             <input type="text" name="district" class="form-control" maxlength="100">
                         </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Latitude</label>
+                            <input type="text" name="latitude" class="form-control" placeholder="-26.2041000">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Longitude</label>
+                            <input type="text" name="longitude" class="form-control" placeholder="28.0473000">
+                        </div>
                     </div>
 
                     <div class="d-flex justify-content-end gap-2 border-top mt-4 pt-4">

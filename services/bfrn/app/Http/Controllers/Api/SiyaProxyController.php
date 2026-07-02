@@ -155,6 +155,22 @@ class SiyaProxyController extends Controller
         return $this->passthrough($res);
     }
 
+    private function normalizeAddressCoordinates(array $payload): array
+    {
+        foreach (['latitude', 'longitude'] as $field) {
+            if (!array_key_exists($field, $payload)) {
+                $payload[$field] = null;
+                continue;
+            }
+
+            $value = trim((string) $payload[$field]);
+
+            $payload[$field] = $value === '' ? null : $value;
+        }
+
+        return $payload;
+    }
+
     public function addressesIndex(Request $request)
     {
         $url = $this->url('/api/addresses/');
@@ -192,7 +208,7 @@ class SiyaProxyController extends Controller
     {
         $url = $this->url('/api/addresses/');
 
-        $payload = $request->all();
+        $payload = $this->normalizeAddressCoordinates($request->all());
         $timestamp = now()->toIso8601String();
 
         $payload['bu'] = $this->activeBuId();
@@ -240,7 +256,7 @@ class SiyaProxyController extends Controller
     {
         $url = $this->url("/api/addresses/{$id}/");
 
-        $payload = $request->all();
+        $payload = $this->normalizeAddressCoordinates($request->all());
 
         $payload['adress_type'] = $payload['adress_type']
             ?? $payload['address_type']
