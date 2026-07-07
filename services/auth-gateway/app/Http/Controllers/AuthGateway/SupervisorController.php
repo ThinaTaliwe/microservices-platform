@@ -257,6 +257,71 @@ class SupervisorController extends Controller
                     }
 
                     if ($identity->bfrn_user_id) {
+                        $defaultBuId = $approvedBuId ?: (int) env('BFRN_DEFAULT_BU_ID', 8);
+
+                        $bu = DB::connection('bfrn_mysql')
+                            ->table('bu')
+                            ->where('id', $defaultBuId)
+                            ->first(['id', 'system_id']);
+
+                        if ($bu) {
+                            DB::connection('bfrn_mysql')
+                                ->table('users_has_bu')
+                                ->updateOrInsert(
+                                    [
+                                        'users_id' => $identity->bfrn_user_id,
+                                        'bu_id' => $bu->id,
+                                    ],
+                                    [
+                                        'requested' => 0,
+                                        'has_access' => 1,
+                                        'updated_at' => now(),
+                                        'created_at' => now(),
+                                    ]
+                                );
+
+                            DB::connection('bfrn_mysql')
+                                ->table('user_has_system')
+                                ->updateOrInsert(
+                                    [
+                                        'users_id' => $identity->bfrn_user_id,
+                                        'system_id' => $bu->system_id,
+                                        'bu_id' => $bu->id,
+                                    ],
+                                    [
+                                        'full_access' => 1,
+                                        'system_size' => 'S',
+                                        'company_id' => null,
+                                        'component_id' => null,
+                                        'updated_at' => now(),
+                                        'created_at' => now(),
+                                    ]
+                                );
+                        }
+
+                        if ($email) {
+                            $temporaryPassword = $temporaryPassword ?: Str::password(14);
+
+                            DB::connection('bfrn_mysql')
+                                ->table('users')
+                                ->where('id', $identity->bfrn_user_id)
+                                ->update([
+                                    'email_verified_at' => now(),
+                                    'password' => Hash::make($temporaryPassword),
+                                    'must_change_password' => 1,
+                                    'welcome_valid_until' => now()->addYear(),
+                                    'updated_at' => now(),
+                                ]);
+
+                            $mailPayload = [
+                                'identity_id' => $identity->id,
+                                'login_attempt_id' => $approval->login_attempt_id,
+                                'email' => $email,
+                                'temporary_password' => $temporaryPassword,
+                                'bfrn_user_id' => $identity->bfrn_user_id,
+                            ];
+                        }
+
                         $handoffToken = Str::random(80);
                         $handoffUrl = rtrim((string) env('BFRN_BASE_URL'), '/') . '/bfrn/gateway-login?token=' . $handoffToken;
 
