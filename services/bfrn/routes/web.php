@@ -177,6 +177,11 @@ Route::prefix('bfrn')->name('bfrn.')->group(function () {
     });
 
 
+    Route::get('/operations/dashboard/map-data', [OperationsDashboardController::class, 'mapData'])
+        ->middleware(\App\Http\Middleware\EnsureBfrnComponentPermission::class . ':dash,read')
+        ->name('operations.dashboard.map-data');
+
+
     Route::get('/operations/addresses', [AddressController::class, 'index'])
         ->middleware(\App\Http\Middleware\EnsureBfrnComponentPermission::class . ':ship,read')
         ->name('operations.addresses.index');
