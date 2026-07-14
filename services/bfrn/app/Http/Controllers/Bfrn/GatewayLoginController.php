@@ -3,42 +3,44 @@
 namespace App\Http\Controllers\Bfrn;
 
 use App\Http\Controllers\Controller;
+use App\Services\Iam\IamHandoffClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class GatewayLoginController extends Controller
 {
+    public function __construct(
+        private readonly IamHandoffClient $iamHandoffClient
+    ) {
+    }
+
     public function __invoke(Request $request)
     {
         $token = (string) $request->query('token');
 
-        if (!$token) {
+        if ($token === '') {
             abort(403, 'Missing gateway token.');
         }
 
-        $tokenHash = hash_hmac('sha256', $token, env('AUTH_GATEWAY_HANDOFF_SECRET'));
+        $handoff = $this->iamHandoffClient->consume($token);
 
-        $handoff = DB::connection('auth_gateway_mysql')
-            ->table('auth_handoff_tokens')
-            ->where('token_hash', $tokenHash)
-            ->whereNull('used_at')
-            ->where('expires_at', '>=', now())
-            ->first();
-
-        if (!$handoff) {
-            abort(403, 'Invalid or expired gateway token.');
+        if (!$handoff || empty($handoff->bfrn_user_id)) {
+            abort(403, 'Invalid, expired, or already-used gateway token.');
         }
 
         $user = DB::table('users')
-            ->where('id', $handoff->bfrn_user_id)
+            ->where('id', (int) $handoff->bfrn_user_id)
             ->first();
 
         if (!$user) {
             abort(403, 'Linked BFRN user not found.');
         }
 
-        if ($user->welcome_valid_until && strtotime($user->welcome_valid_until) < time()) {
+        if (
+            $user->welcome_valid_until
+            && strtotime($user->welcome_valid_until) < time()
+        ) {
             abort(403, 'Linked BFRN user is disabled.');
         }
 
@@ -48,23 +50,23 @@ class GatewayLoginController extends Controller
             abort(403, 'Linked BFRN user has no active business unit access.');
         }
 
-        DB::connection('auth_gateway_mysql')
-            ->table('auth_handoff_tokens')
-            ->where('id', $handoff->id)
-            ->update([
-                'used_at' => now(),
-                'updated_at' => now(),
-            ]);
-
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        Auth::loginUsingId($user->id);
+        Auth::loginUsingId((int) $user->id);
         $request->session()->regenerate();
 
-        $preferredBusinessUnit = $businessUnits->firstWhere('id', 8) ?: $businessUnits->first();
+        $preferredBusinessUnit = $businessUnits->firstWhere('id', 8)
+            ?: $businessUnits->first();
 
         $this->setActiveBusinessUnit($request, $preferredBusinessUnit);
+
+        if (!empty($handoff->iam_session_id)) {
+            $request->session()->put([
+                'iam_session_id' => (int) $handoff->iam_session_id,
+                'iam_session_validated_at' => now()->timestamp,
+            ]);
+        }
 
         $request->session()->save();
 
@@ -97,8 +99,10 @@ class GatewayLoginController extends Controller
             ->get();
     }
 
-    private function setActiveBusinessUnit(Request $request, $businessUnit): void
-    {
+    private function setActiveBusinessUnit(
+        Request $request,
+        object $businessUnit
+    ): void {
         $request->session()->put([
             'active_bu_id' => $businessUnit->id,
             'active_bu_name' => $businessUnit->bu_name,
