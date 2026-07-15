@@ -77,3 +77,6 @@ naming
 [internal]
 [stage-0
 [users-php
+
+# Local database reverse-engineering evidence
+docs/database/inspection/
