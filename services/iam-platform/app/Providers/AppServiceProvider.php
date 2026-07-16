@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Authorization\Contracts\ContextAccessRepository;
+use App\Authorization\Contracts\RequestContextResolver;
+use App\Authorization\Resolver\SessionRequestContextResolver;
 use App\Authorization\Repository\CachedContextAccessRepository;
 use App\Authorization\Repository\DatabaseContextAccessRepository;
 use Illuminate\Support\Facades\Cache;
@@ -51,6 +53,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             ContextAccessRepository::class,
             CachedContextAccessRepository::class
+        );
+
+        $this->app->bind(
+            RequestContextResolver::class,
+            SessionRequestContextResolver::class
         );
     }
 
