@@ -10,6 +10,7 @@ use App\Http\Middleware\EnsureContextPermission;
 use Illuminate\Http\Request;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Tests\Unit\Authorization\Fakes\FakeComponentReferenceResolver;
 use Tests\Unit\Authorization\Fakes\FakeContextAccessRepository;
 use Tests\Unit\Authorization\Fakes\FakeRequestContextResolver;
 
@@ -57,7 +58,7 @@ class EnsureContextPermissionTest extends TestCase
                     200
                 ),
             'iam.sessions.read',
-            '5'
+            'iam-sessions'
         );
 
         $this->assertSame(200, $response->getStatusCode());
@@ -105,7 +106,7 @@ class EnsureContextPermissionTest extends TestCase
                         'Request should not continue.'
                     ),
                 'iam.sessions.revoke',
-                '5'
+                'iam-sessions'
             );
 
             $this->fail(
@@ -181,6 +182,8 @@ class EnsureContextPermissionTest extends TestCase
             decisions: $this->decisionService(
                 AccessSnapshot::denied()
             ),
+            components:
+                new FakeComponentReferenceResolver(null),
         );
 
         $request = Request::create(
@@ -208,8 +211,7 @@ class EnsureContextPermissionTest extends TestCase
                 $exception->getStatusCode()
             );
 
-            $this->assertSame(
-                0,
+            $this->assertNull(
                 $resolver->receivedComponentId
             );
         }
@@ -226,6 +228,8 @@ class EnsureContextPermissionTest extends TestCase
             decisions: $this->decisionService(
                 $snapshot
             ),
+            components:
+                new FakeComponentReferenceResolver(5),
         );
     }
 

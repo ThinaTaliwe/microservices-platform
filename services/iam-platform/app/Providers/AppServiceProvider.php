@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Authorization\Contracts\ComponentReferenceResolver;
+use App\Authorization\Resolver\CachedComponentReferenceResolver;
 use App\Authorization\Contracts\ContextAccessRepository;
 use App\Authorization\Contracts\RequestContextResolver;
 use App\Authorization\Resolver\SessionRequestContextResolver;
@@ -58,6 +60,32 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             RequestContextResolver::class,
             SessionRequestContextResolver::class
+        );
+
+        $this->app->singleton(
+            ComponentReferenceResolver::class,
+            function (): CachedComponentReferenceResolver {
+                $store = config(
+                    'authorization.cache.store'
+                );
+
+                $cache = $store
+                    ? Cache::store((string) $store)
+                    : Cache::store();
+
+                return new CachedComponentReferenceResolver(
+                    database: app('db')->connection(),
+                    cache: $cache,
+                    ttlSeconds: (int) config(
+                        'authorization.cache.ttl_seconds',
+                        900
+                    ),
+                    prefix: (string) config(
+                        'authorization.cache.prefix',
+                        'iam:v2:authorization'
+                    ) . ':component-reference',
+                );
+            }
         );
     }
 
