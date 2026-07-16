@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AuthIdentity;
 use App\Models\User;
 
 return [
@@ -65,6 +66,11 @@ return [
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', User::class),
+        ],
+
+        'identities' => [
+            'driver' => 'eloquent',
+            'model' => AuthIdentity::class,
         ],
 
         // 'users' => [
