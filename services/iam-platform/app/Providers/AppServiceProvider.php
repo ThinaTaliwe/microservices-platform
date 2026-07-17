@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Authorization\Contracts\AuthorizationCacheInvalidator;
 use App\Authorization\Contracts\ComponentReferenceResolver;
 use App\Authorization\Resolver\CachedComponentReferenceResolver;
 use App\Authorization\Contracts\ContextAccessRepository;
@@ -54,6 +55,11 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->bind(
             ContextAccessRepository::class,
+            CachedContextAccessRepository::class
+        );
+
+        $this->app->bind(
+            AuthorizationCacheInvalidator::class,
             CachedContextAccessRepository::class
         );
 

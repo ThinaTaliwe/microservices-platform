@@ -2,13 +2,15 @@
 
 namespace App\Authorization\Repository;
 
+use App\Authorization\Contracts\AuthorizationCacheInvalidator;
 use App\Authorization\Contracts\ContextAccessRepository;
 use App\Authorization\Context\AccessContext;
 use App\Authorization\Snapshot\AccessSnapshot;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
 
 class CachedContextAccessRepository implements
-    ContextAccessRepository
+    ContextAccessRepository,
+    AuthorizationCacheInvalidator
 {
     public function __construct(
         private readonly ContextAccessRepository $repository,
