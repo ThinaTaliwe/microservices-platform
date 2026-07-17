@@ -6,10 +6,12 @@ use App\Authorization\Contracts\AuthorizationCacheInvalidator;
 use App\Authorization\Contracts\ComponentReferenceResolver;
 use App\Authorization\Resolver\CachedComponentReferenceResolver;
 use App\Authorization\Contracts\ContextAccessRepository;
+use App\Authorization\Contracts\ContextRoleAssignmentRepository;
 use App\Authorization\Contracts\RequestContextResolver;
 use App\Authorization\Resolver\SessionRequestContextResolver;
 use App\Authorization\Repository\CachedContextAccessRepository;
 use App\Authorization\Repository\DatabaseContextAccessRepository;
+use App\Authorization\Repository\DatabaseContextRoleAssignmentRepository;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\ServiceProvider;
 
@@ -61,6 +63,15 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             AuthorizationCacheInvalidator::class,
             CachedContextAccessRepository::class
+        );
+
+        $this->app->singleton(
+            DatabaseContextRoleAssignmentRepository::class
+        );
+
+        $this->app->bind(
+            ContextRoleAssignmentRepository::class,
+            DatabaseContextRoleAssignmentRepository::class
         );
 
         $this->app->bind(
