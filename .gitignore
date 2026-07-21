@@ -80,3 +80,6 @@ naming
 
 # Local database reverse-engineering evidence
 docs/database/inspection/
+
+# Safe PHPUnit environment
+!services/iam-platform/.env.testing
