@@ -2,6 +2,10 @@
 
 namespace Tests\Unit\Authorization;
 
+use App\Authorization\Assignment\ContextRoleAssignmentService;
+use App\Authorization\Assignment\Http\ContextRoleAssignmentFactory;
+use Tests\Unit\Authorization\Fakes\FakeAuthorizationCacheInvalidator;
+use Tests\Unit\Authorization\Fakes\FakeContextRoleAssignmentRepository;
 use App\Authorization\Assignment\Http\ContextRoleAssignmentFilterFactory;
 use App\Authorization\Assignment\Query\ContextRoleAssignmentQueryService;
 use App\Authorization\Assignment\Query\ContextRoleAssignmentView;
@@ -53,6 +57,13 @@ class ContextRoleAssignmentControllerTest extends TestCase
                     ),
                 filters:
                     new ContextRoleAssignmentFilterFactory(),
+                assignments:
+                    new ContextRoleAssignmentService(
+                        new FakeContextRoleAssignmentRepository(),
+                        new FakeAuthorizationCacheInvalidator(),
+                    ),
+                assignmentFactory:
+                    new ContextRoleAssignmentFactory(),
             );
 
         $response = $controller->index(
@@ -102,6 +113,13 @@ class ContextRoleAssignmentControllerTest extends TestCase
                     ),
                 filters:
                     new ContextRoleAssignmentFilterFactory(),
+                assignments:
+                    new ContextRoleAssignmentService(
+                        new FakeContextRoleAssignmentRepository(),
+                        new FakeAuthorizationCacheInvalidator(),
+                    ),
+                assignmentFactory:
+                    new ContextRoleAssignmentFactory(),
             );
 
         $response = $controller->index(

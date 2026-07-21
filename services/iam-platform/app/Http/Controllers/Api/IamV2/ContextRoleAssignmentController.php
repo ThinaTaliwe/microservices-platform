@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers\Api\IamV2;
 
+use App\Authorization\Assignment\ContextRoleAssignmentException;
+use App\Authorization\Assignment\ContextRoleAssignmentService;
+use App\Authorization\Assignment\Http\ContextRoleAssignmentFactory;
 use App\Authorization\Assignment\Http\ContextRoleAssignmentFilterFactory;
 use App\Authorization\Assignment\Query\ContextRoleAssignmentQueryService;
 use Illuminate\Http\JsonResponse;
@@ -13,6 +16,8 @@ class ContextRoleAssignmentController
     public function __construct(
         private readonly ContextRoleAssignmentQueryService $queries,
         private readonly ContextRoleAssignmentFilterFactory $filters,
+        private readonly ContextRoleAssignmentService $assignments,
+        private readonly ContextRoleAssignmentFactory $assignmentFactory,
     ) {
     }
 
@@ -74,4 +79,70 @@ class ContextRoleAssignmentController
             ],
         ]);
     }
+
+    public function store(
+        Request $request
+    ): JsonResponse {
+        try {
+            $assignment =
+                $this->assignmentFactory->fromRequest(
+                    $request
+                );
+
+            $this->assignments->assign(
+                $assignment
+            );
+        } catch (InvalidArgumentException $exception) {
+            return new JsonResponse(
+                [
+                    'message' =>
+                        'Invalid role assignment.',
+                    'error' =>
+                        $exception->getMessage(),
+                ],
+                422
+            );
+        } catch (
+            ContextRoleAssignmentException $exception
+        ) {
+            return new JsonResponse(
+                [
+                    'message' =>
+                        'Role assignment was rejected.',
+                    'error' =>
+                        $exception->getMessage(),
+                ],
+                422
+            );
+        }
+
+        return new JsonResponse(
+            [
+                'message' =>
+                    'Role assignment saved successfully.',
+                'assignment' => [
+                    'auth_identity_id' =>
+                        $assignment->authIdentityId,
+                    'role' =>
+                        $assignment->normalizedRoleName(),
+                    'company_id' =>
+                        $assignment->companyId,
+                    'business_unit_id' =>
+                        $assignment->businessUnitId,
+                    'system_id' =>
+                        $assignment->systemId,
+                    'valid_from' =>
+                        $assignment->validFrom?->format(
+                            'Y-m-d H:i:s'
+                        ),
+                    'valid_until' =>
+                        $assignment->validUntil?->format(
+                            'Y-m-d H:i:s'
+                        ),
+                ],
+            ],
+            201
+        );
+    }
+
 }

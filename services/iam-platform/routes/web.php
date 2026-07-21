@@ -57,3 +57,13 @@ Route::get(
         . ':iam.context.read,iam-contexts'
     )
     ->name('iam-v2.role-assignments.index');
+
+Route::post(
+    '/iam-v2/role-assignments',
+    [ContextRoleAssignmentController::class, 'store']
+)
+    ->middleware(
+        EnsureContextPermission::class
+        . ':iam.context.manage,iam-contexts'
+    )
+    ->name('iam-v2.role-assignments.store');
