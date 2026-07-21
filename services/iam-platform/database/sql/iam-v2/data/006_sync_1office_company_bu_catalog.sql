@@ -28,16 +28,36 @@ status = VALUES(status),
 updated_at = VALUES(updated_at);
 
 CREATE TEMPORARY TABLE iam_v2_source_business_units (
-company_external_key VARCHAR(100) NOT NULL,
-external_key VARCHAR(100) NOT NULL,
-name VARCHAR(191) NOT NULL,
-slug VARCHAR(191) NOT NULL,
-status VARCHAR(30) NOT NULL,
-source_short_code VARCHAR(20) NULL,
+company_external_key VARCHAR(100)
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci
+    NOT NULL,
+external_key VARCHAR(100)
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci
+    NOT NULL,
+name VARCHAR(191)
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci
+    NOT NULL,
+slug VARCHAR(191)
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci
+    NOT NULL,
+status VARCHAR(30)
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci
+    NOT NULL,
+source_short_code VARCHAR(20)
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci
+    NULL,
 created_at TIMESTAMP NULL,
 updated_at TIMESTAMP NULL,
 PRIMARY KEY (external_key)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB
+  DEFAULT CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
 
 INSERT INTO iam_v2_source_business_units (
 company_external_key,
