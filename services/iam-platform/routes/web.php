@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\IamV2\ContextRoleAssignmentController;
+use App\Http\Controllers\IamV2\ContextRoleAssignmentPageController;
 use App\Http\Middleware\EnsureContextPermission;
 use App\Http\Controllers\AuthGateway\LoginController;
 use App\Http\Controllers\AuthGateway\OtpController;
@@ -35,6 +36,17 @@ Route::post('/supervisor/{id}/approve', [SupervisorController::class, 'approve']
 
 Route::post('/supervisor/{id}/block', [SupervisorController::class, 'block'])
     ->name('supervisor.block');
+
+Route::get(
+    '/iam-v2/administration/role-assignments',
+    ContextRoleAssignmentPageController::class
+)
+    ->middleware(
+        EnsureContextPermission::class
+        . ':iam.context.read,iam-contexts'
+    )
+    ->name('iam-v2.role-assignments.page');
+
 
 Route::get(
     '/iam-v2/role-assignments',
