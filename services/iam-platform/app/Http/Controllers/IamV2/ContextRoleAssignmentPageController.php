@@ -14,6 +14,12 @@ class ContextRoleAssignmentPageController
                 'assignmentEndpoint' => route(
                     'iam-v2.role-assignments.index'
                 ),
+                'assignmentStoreEndpoint' => route(
+                    'iam-v2.role-assignments.store'
+                ),
+                'assignmentCatalogueEndpoint' => route(
+                    'iam-v2.role-assignments.catalogue'
+                ),
             ]
         );
     }

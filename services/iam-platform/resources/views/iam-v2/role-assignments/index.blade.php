@@ -10,10 +10,46 @@
 @section('content')
 <div
     x-data="roleAssignmentPage({
-        endpoint: @js($assignmentEndpoint)
+        endpoint: @js($assignmentEndpoint),
+        storeEndpoint: @js($assignmentStoreEndpoint),
+        catalogueEndpoint: @js($assignmentCatalogueEndpoint),
+        csrfToken: @js(csrf_token())
     })"
-    x-init="load()"
+    x-init="initialize()"
 >
+    <div
+        class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-3"
+    >
+        <div>
+            <h2 class="h5 fw-bold mb-1">
+                Assignment Administration
+            </h2>
+
+            <div class="small text-secondary">
+                Review and create contextual role assignments.
+            </div>
+        </div>
+
+        <button
+            type="button"
+            class="btn btn-primary"
+            :disabled="catalogueLoading"
+            @click="openCreateModal()"
+        >
+            <span
+                x-show="catalogueLoading"
+                class="spinner-border spinner-border-sm me-1"
+            ></span>
+
+            <i
+                x-show="!catalogueLoading"
+                class="bi bi-person-plus me-1"
+            ></i>
+
+            Assign Role
+        </button>
+    </div>
+
     <section class="row g-3 mb-3">
         <div class="col-6 col-xl-3">
             <div class="iam-card p-3 h-100">
@@ -214,6 +250,16 @@
         role="alert"
     >
         <span x-text="errorMessage"></span>
+    </div>
+
+    <div
+        x-cloak
+        x-show="successMessage"
+        class="alert alert-success"
+        role="status"
+    >
+        <i class="bi bi-check-circle me-1"></i>
+        <span x-text="successMessage"></span>
     </div>
 
     <section class="iam-card overflow-hidden">
@@ -418,6 +464,10 @@
         </footer>
     </section>
 
+    @include(
+        'iam-v2.role-assignments.partials.create-modal'
+    )
+
     <div
         x-cloak
         x-show="selectedAssignment !== null"
@@ -495,12 +545,39 @@
     function roleAssignmentPage(config) {
         return {
             endpoint: config.endpoint,
+            storeEndpoint: config.storeEndpoint,
+            catalogueEndpoint: config.catalogueEndpoint,
+            csrfToken: config.csrfToken,
 
             loading: false,
+            catalogueLoading: false,
+            submitting: false,
+
             errorMessage: '',
+            successMessage: '',
+            formError: '',
 
             assignments: [],
             selectedAssignment: null,
+            createModalOpen: false,
+
+            catalogue: {
+                identities: [],
+                roles: [],
+                companies: [],
+                business_units: [],
+                systems: [],
+            },
+
+            form: {
+                auth_identity_id: '',
+                role: '',
+                company_id: '',
+                business_unit_id: '',
+                system_id: '',
+                valid_from: '',
+                valid_until: '',
+            },
 
             filters: {
                 auth_identity_id: '',
@@ -516,6 +593,29 @@
                 per_page: 25,
                 total: 0,
                 last_page: 1,
+            },
+
+            get filteredBusinessUnits() {
+                const companyId = Number(
+                    this.form.company_id
+                );
+
+                if (!companyId) {
+                    return [];
+                }
+
+                return this.catalogue.business_units.filter(
+                    businessUnit =>
+                        Number(businessUnit.company_id)
+                            === companyId
+                );
+            },
+
+            get canSubmit() {
+                return Boolean(
+                    this.form.auth_identity_id
+                    && this.form.role
+                );
             },
 
             get activeOnPage() {
@@ -595,6 +695,169 @@
                         ),
                     },
                 ];
+            },
+
+            async initialize() {
+                await Promise.all([
+                    this.load(),
+                    this.loadCatalogue(),
+                ]);
+            },
+
+            async loadCatalogue() {
+                this.catalogueLoading = true;
+                this.formError = '';
+
+                try {
+                    const response = await fetch(
+                        this.catalogueEndpoint,
+                        {
+                            headers: {
+                                Accept: 'application/json',
+                                'X-Requested-With':
+                                    'XMLHttpRequest',
+                            },
+                            credentials: 'same-origin',
+                        }
+                    );
+
+                    const payload = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(
+                            payload.error
+                            || payload.message
+                            || 'Unable to load assignment options.'
+                        );
+                    }
+
+                    this.catalogue = {
+                        identities:
+                            Array.isArray(payload.identities)
+                                ? payload.identities
+                                : [],
+                        roles:
+                            Array.isArray(payload.roles)
+                                ? payload.roles
+                                : [],
+                        companies:
+                            Array.isArray(payload.companies)
+                                ? payload.companies
+                                : [],
+                        business_units:
+                            Array.isArray(payload.business_units)
+                                ? payload.business_units
+                                : [],
+                        systems:
+                            Array.isArray(payload.systems)
+                                ? payload.systems
+                                : [],
+                    };
+                } catch (error) {
+                    this.formError =
+                        error instanceof Error
+                            ? error.message
+                            : 'Unable to load assignment options.';
+                } finally {
+                    this.catalogueLoading = false;
+                }
+            },
+
+            openCreateModal() {
+                this.formError = '';
+                this.successMessage = '';
+                this.createModalOpen = true;
+            },
+
+            closeCreateModal() {
+                if (this.submitting) {
+                    return;
+                }
+
+                this.createModalOpen = false;
+                this.formError = '';
+                this.resetForm();
+            },
+
+            resetForm() {
+                this.form = {
+                    auth_identity_id: '',
+                    role: '',
+                    company_id: '',
+                    business_unit_id: '',
+                    system_id: '',
+                    valid_from: '',
+                    valid_until: '',
+                };
+            },
+
+            async submitAssignment() {
+                if (!this.canSubmit || this.submitting) {
+                    return;
+                }
+
+                this.submitting = true;
+                this.formError = '';
+                this.successMessage = '';
+
+                const payload = {};
+
+                Object.entries(this.form).forEach(
+                    ([key, value]) => {
+                        const normalized =
+                            String(value ?? '').trim();
+
+                        if (normalized !== '') {
+                            payload[key] = normalized;
+                        }
+                    }
+                );
+
+                try {
+                    const response = await fetch(
+                        this.storeEndpoint,
+                        {
+                            method: 'POST',
+                            headers: {
+                                Accept: 'application/json',
+                                'Content-Type':
+                                    'application/json',
+                                'X-CSRF-TOKEN':
+                                    this.csrfToken,
+                                'X-Requested-With':
+                                    'XMLHttpRequest',
+                            },
+                            credentials: 'same-origin',
+                            body: JSON.stringify(payload),
+                        }
+                    );
+
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(
+                            result.error
+                            || result.message
+                            || 'Unable to save role assignment.'
+                        );
+                    }
+
+                    this.createModalOpen = false;
+                    this.resetForm();
+
+                    this.successMessage =
+                        result.message
+                        || 'Role assignment saved successfully.';
+
+                    await this.load(1);
+                } catch (error) {
+                    this.formError =
+                        error instanceof Error
+                            ? error.message
+                            : 'Unable to save role assignment.';
+                } finally {
+                    this.submitting = false;
+                }
             },
 
             async load(page = 1) {

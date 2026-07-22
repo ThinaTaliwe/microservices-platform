@@ -94,6 +94,28 @@ class ContextRoleAssignmentPageRouteTest extends TestCase
                 route(
                     'iam-v2.role-assignments.index'
                 )
+            )
+            ->assertViewHas(
+                'assignmentStoreEndpoint',
+                route(
+                    'iam-v2.role-assignments.store'
+                )
+            )
+            ->assertViewHas(
+                'assignmentCatalogueEndpoint',
+                route(
+                    'iam-v2.role-assignments.catalogue'
+                )
+            )
+            ->assertSee(
+                'Assign Role'
+            )
+            ->assertSee(
+                'Assign Contextual Role'
+            )
+            ->assertSee(
+                'submitAssignment()',
+                false
             );
     }
 }
