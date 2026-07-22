@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Authorization\Assignment\Catalogue\DatabaseContextRoleAssignmentCatalogue;
+use App\Authorization\Contracts\ContextRoleAssignmentCatalogue;
 use App\Authorization\Contracts\AuthorizationCacheInvalidator;
 use App\Authorization\Contracts\ComponentReferenceResolver;
 use App\Authorization\Resolver\CachedComponentReferenceResolver;
@@ -21,6 +23,10 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->bind(
+            ContextRoleAssignmentCatalogue::class,
+            DatabaseContextRoleAssignmentCatalogue::class
+        );
         $this->app->singleton(
             DatabaseContextAccessRepository::class
         );

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\IamV2\ContextRoleAssignmentController;
+use App\Http\Controllers\Api\IamV2\ContextRoleAssignmentCatalogueController;
 use App\Http\Controllers\IamV2\ContextRoleAssignmentPageController;
 use App\Http\Middleware\EnsureContextPermission;
 use App\Http\Controllers\AuthGateway\LoginController;
@@ -67,3 +68,13 @@ Route::post(
         . ':iam.context.manage,iam-contexts'
     )
     ->name('iam-v2.role-assignments.store');
+
+Route::get(
+    '/iam-v2/role-assignment-catalogue',
+    ContextRoleAssignmentCatalogueController::class
+)
+    ->middleware(
+        EnsureContextPermission::class
+        . ':iam.context.manage,iam-contexts'
+    )
+    ->name('iam-v2.role-assignments.catalogue');
