@@ -13,10 +13,97 @@
         endpoint: @js($assignmentEndpoint),
         storeEndpoint: @js($assignmentStoreEndpoint),
         catalogueEndpoint: @js($assignmentCatalogueEndpoint),
+        activeContextsEndpoint: @js($activeContextsEndpoint),
+        activeContextUpdateEndpoint: @js($activeContextUpdateEndpoint),
         csrfToken: @js(csrf_token())
     })"
     x-init="initialize()"
 >
+    <section class="iam-card p-3 mb-3">
+        <div
+            class="d-flex flex-column flex-lg-row align-items-lg-end gap-3"
+        >
+            <div class="flex-grow-1">
+                <label
+                    for="active-context-selector"
+                    class="form-label small fw-semibold"
+                >
+                    Active Context
+                </label>
+
+                <select
+                    id="active-context-selector"
+                    class="form-select"
+                    x-model="selectedContextKey"
+                    :disabled="
+                        contextLoading
+                        || contextSwitching
+                        || activeContexts.length === 0
+                    "
+                >
+                    <option value="">
+                        Select an authorized context
+                    </option>
+
+                    <template
+                        x-for="context in activeContexts"
+                        :key="contextKey(context)"
+                    >
+                        <option
+                            :value="contextKey(context)"
+                            x-text="
+                                context.company_name
+                                + ' / '
+                                + context.business_unit_name
+                                + ' / '
+                                + context.system_name
+                            "
+                        ></option>
+                    </template>
+                </select>
+
+                <div
+                    class="small text-secondary mt-2"
+                    x-show="!contextLoading"
+                >
+                    Only contexts assigned to your IAM identity
+                    are available.
+                </div>
+            </div>
+
+            <button
+                type="button"
+                class="btn btn-outline-primary"
+                :disabled="
+                    contextLoading
+                    || contextSwitching
+                    || !selectedContextKey
+                    || selectedContextKey === activeContextKey
+                "
+                @click="activateSelectedContext()"
+            >
+                <span
+                    x-show="contextSwitching"
+                    class="spinner-border spinner-border-sm me-1"
+                ></span>
+
+                <i
+                    x-show="!contextSwitching"
+                    class="bi bi-arrow-repeat me-1"
+                ></i>
+
+                Activate Context
+            </button>
+        </div>
+
+        <div
+            x-cloak
+            x-show="contextError"
+            class="alert alert-danger mt-3 mb-0"
+            x-text="contextError"
+        ></div>
+    </section>
+
     <div
         class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-3"
     >
@@ -547,7 +634,18 @@
             endpoint: config.endpoint,
             storeEndpoint: config.storeEndpoint,
             catalogueEndpoint: config.catalogueEndpoint,
+            activeContextsEndpoint:
+                config.activeContextsEndpoint,
+            activeContextUpdateEndpoint:
+                config.activeContextUpdateEndpoint,
             csrfToken: config.csrfToken,
+
+            contextLoading: false,
+            contextSwitching: false,
+            contextError: '',
+            activeContexts: [],
+            selectedContextKey: '',
+            activeContextKey: '',
 
             loading: false,
             catalogueLoading: false,
@@ -697,7 +795,136 @@
                 ];
             },
 
+            contextKey(context) {
+                return [
+                    context.company_id,
+                    context.business_unit_id,
+                    context.system_id
+                ].join(':');
+            },
+
+            contextFromKey(key) {
+                return this.activeContexts.find(
+                    context =>
+                        this.contextKey(context) === key
+                ) ?? null;
+            },
+
+            async loadActiveContexts() {
+                this.contextLoading = true;
+                this.contextError = '';
+
+                try {
+                    const response = await fetch(
+                        this.activeContextsEndpoint,
+                        {
+                            headers: {
+                                Accept: 'application/json'
+                            }
+                        }
+                    );
+
+                    const payload = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(
+                            payload.message
+                            ?? 'Unable to load active contexts.'
+                        );
+                    }
+
+                    this.activeContexts =
+                        Array.isArray(payload.data)
+                            ? payload.data
+                            : [];
+
+                    const active = payload.active ?? {};
+
+                    if (
+                        active.company_id
+                        && active.business_unit_id
+                        && active.system_id
+                    ) {
+                        this.activeContextKey = [
+                            active.company_id,
+                            active.business_unit_id,
+                            active.system_id
+                        ].join(':');
+
+                        this.selectedContextKey =
+                            this.activeContextKey;
+                    }
+                } catch (error) {
+                    this.contextError =
+                        error.message
+                        ?? 'Unable to load active contexts.';
+                } finally {
+                    this.contextLoading = false;
+                }
+            },
+
+            async activateSelectedContext() {
+                const context = this.contextFromKey(
+                    this.selectedContextKey
+                );
+
+                if (!context) {
+                    this.contextError =
+                        'Select an authorized IAM context.';
+                    return;
+                }
+
+                this.contextSwitching = true;
+                this.contextError = '';
+
+                try {
+                    const response = await fetch(
+                        this.activeContextUpdateEndpoint,
+                        {
+                            method: 'POST',
+                            headers: {
+                                Accept: 'application/json',
+                                'Content-Type':
+                                    'application/json',
+                                'X-CSRF-TOKEN':
+                                    this.csrfToken
+                            },
+                            body: JSON.stringify({
+                                company_id:
+                                    context.company_id,
+                                business_unit_id:
+                                    context.business_unit_id,
+                                system_id:
+                                    context.system_id
+                            })
+                        }
+                    );
+
+                    const payload = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(
+                            payload.error
+                            ?? payload.message
+                            ?? 'Unable to activate context.'
+                        );
+                    }
+
+                    this.activeContextKey =
+                        this.selectedContextKey;
+
+                    window.location.reload();
+                } catch (error) {
+                    this.contextError =
+                        error.message
+                        ?? 'Unable to activate context.';
+                } finally {
+                    this.contextSwitching = false;
+                }
+            },
+
             async initialize() {
+                await this.loadActiveContexts();
                 await Promise.all([
                     this.load(),
                     this.loadCatalogue(),

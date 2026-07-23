@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\IamV2\ContextRoleAssignmentController;
 use App\Http\Controllers\Api\IamV2\ContextRoleAssignmentCatalogueController;
+use App\Http\Controllers\IamV2\ActiveContextController;
 use App\Http\Controllers\IamV2\ContextRoleAssignmentPageController;
 use App\Http\Middleware\EnsureContextPermission;
 use App\Http\Controllers\AuthGateway\LoginController;
@@ -37,6 +38,17 @@ Route::post('/supervisor/{id}/approve', [SupervisorController::class, 'approve']
 
 Route::post('/supervisor/{id}/block', [SupervisorController::class, 'block'])
     ->name('supervisor.block');
+
+Route::get(
+    '/iam-v2/active-contexts',
+    [ActiveContextController::class, 'index']
+)->name('iam-v2.active-contexts.index');
+
+Route::post(
+    '/iam-v2/active-context',
+    [ActiveContextController::class, 'update']
+)->name('iam-v2.active-contexts.update');
+
 
 Route::get(
     '/iam-v2/administration/role-assignments',

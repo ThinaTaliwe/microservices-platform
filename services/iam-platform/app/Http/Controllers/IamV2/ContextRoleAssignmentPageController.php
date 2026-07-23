@@ -11,6 +11,12 @@ class ContextRoleAssignmentPageController
         return view(
             'iam-v2.role-assignments.index',
             [
+                'activeContextsEndpoint' => route(
+                    'iam-v2.active-contexts.index'
+                ),
+                'activeContextUpdateEndpoint' => route(
+                    'iam-v2.active-contexts.update'
+                ),
                 'assignmentEndpoint' => route(
                     'iam-v2.role-assignments.index'
                 ),
