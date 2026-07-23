@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\AuthGateway;
 
+use App\Authorization\Bootstrap\BootstrapAdministratorService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
@@ -18,7 +19,8 @@ class LoginController extends Controller
     public function __construct(
         private readonly BfrnApiClient $bfrnApiClient,
         private readonly OtpChallengeService $otpChallenges,
-        private readonly AuthSessionService $authSessions
+        private readonly AuthSessionService $authSessions,
+        private readonly BootstrapAdministratorService $bootstrapAdministrators,
     ) {
     }
 
@@ -40,7 +42,45 @@ class LoginController extends Controller
         $email = Str::lower(trim($validated['email']));
         $emailHash = hash_hmac('sha256', $email, config('app.key'));
 
-        $bfrnUser = $this->bfrnApiClient->findUserByEmail($email);
+        $isBootstrapAdministrator =
+            $this->bootstrapAdministrators
+                ->isBootstrapAdministrator($email);
+
+        $bfrnUser = $this->bfrnApiClient
+            ->findUserByEmail($email);
+
+        if ($isBootstrapAdministrator && !$bfrnUser) {
+            $defaultBusinessUnitId = (int) env(
+                'BFRN_DEFAULT_BU_ID',
+                8
+            );
+
+            $provisionedUser = $this->bfrnApiClient
+                ->provisionUser(
+                    $email,
+                    $defaultBusinessUnitId
+                );
+
+            if (
+                !$provisionedUser
+                || empty($provisionedUser->user_id)
+            ) {
+                throw new \RuntimeException(
+                    'Bootstrap administrator BFRN '
+                    . 'provisioning failed.'
+                );
+            }
+
+            $bfrnUser = $this->bfrnApiClient
+                ->findUserByEmail($email);
+
+            if (!$bfrnUser) {
+                throw new \RuntimeException(
+                    'The provisioned bootstrap administrator '
+                    . 'could not be resolved in BFRN.'
+                );
+            }
+        }
 
         $bfrnUserExists = (bool) $bfrnUser;
 
@@ -76,21 +116,36 @@ class LoginController extends Controller
         }
 
         $riskLevel = match (true) {
+            $isBootstrapAdministrator => 'low',
             !$bfrnUserExists => 'high',
             !$bfrnUserActive => 'high',
             !$knownTrustedDevice => 'high',
             default => 'low',
         };
 
-        $decision = $riskLevel === 'low'
+        $decision = $isBootstrapAdministrator
             ? 'captured'
-            : 'supervisor_review';
+            : (
+                $riskLevel === 'low'
+                    ? 'captured'
+                    : 'supervisor_review'
+            );
 
         $decisionReason = match (true) {
-            !$bfrnUserExists => 'Email does not exist in BFRN users table. Supervisor review required.',
-            !$bfrnUserActive => 'BFRN user exists but is disabled. Supervisor review required.',
-            !$knownTrustedDevice => 'New device detected. Supervisor review required.',
-            default => 'Known active BFRN user using trusted device.',
+            $isBootstrapAdministrator =>
+                'Configured bootstrap administrator. '
+                . 'OTP verification required.',
+            !$bfrnUserExists =>
+                'Email does not exist in BFRN users table. '
+                . 'Supervisor review required.',
+            !$bfrnUserActive =>
+                'BFRN user exists but is disabled. '
+                . 'Supervisor review required.',
+            !$knownTrustedDevice =>
+                'New device detected. '
+                . 'Supervisor review required.',
+            default =>
+                'Known active BFRN user using trusted device.',
         };
 
         $payload = [
@@ -108,6 +163,8 @@ class LoginController extends Controller
             'bfrn_user_id' => $bfrnUser->id ?? null,
             'risk_level' => $riskLevel,
             'decision' => $decision,
+            'bootstrap_administrator' =>
+                $isBootstrapAdministrator,
             'submitted_at' => now()->toDateTimeString(),
         ];
 
@@ -133,13 +190,25 @@ class LoginController extends Controller
                 ]);
         }
 
+        if ($isBootstrapAdministrator) {
+            $this->bootstrapAdministrators->provision(
+                authIdentityId: (int) $identityId,
+                email: $email,
+            );
+        }
+
         DB::table('auth_devices')->updateOrInsert(
             [
                 'auth_identity_id' => $identityId,
                 'device_hash' => $deviceHash,
             ],
             [
-                'device_payload_encrypted' => Crypt::encryptString(json_encode($payload)),
+                'device_payload_encrypted' =>
+                    Crypt::encryptString(
+                        json_encode($payload)
+                    ),
+                'trusted' =>
+                    $isBootstrapAdministrator ? 1 : 0,
                 'last_seen_at' => now(),
                 'updated_at' => now(),
             ]
@@ -243,7 +312,12 @@ class LoginController extends Controller
                 $riskLevel
             );
 
-            if ($reusableSession && $bfrnUser && !empty($bfrnUser->id)) {
+            if (
+                !$isBootstrapAdministrator
+                && $reusableSession
+                && $bfrnUser
+                && !empty($bfrnUser->id)
+            ) {
                 $handoffToken = $this->authSessions->createHandoff(
                     (int) $reusableSession->id,
                     $identityId,

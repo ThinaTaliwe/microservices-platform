@@ -551,14 +551,17 @@
         </footer>
     </section>
 
-    @include(
-        'iam-v2.role-assignments.partials.create-modal'
-    )
+    <template x-if="createModalOpen">
+        <div>
+            @include(
+                'iam-v2.role-assignments.partials.create-modal'
+            )
+        </div>
+    </template>
 
+    <template x-if="selectedAssignment !== null">
+        <div>
     <div
-        x-cloak
-        x-show="selectedAssignment !== null"
-        x-transition.opacity
         class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center p-3"
         style="
             z-index: 2000;
@@ -624,6 +627,8 @@
             </div>
         </section>
     </div>
+        </div>
+    </template>
 </div>
 @endsection
 

@@ -2,6 +2,7 @@
 
 namespace App\Authorization\Resolver;
 
+use App\Authorization\Bootstrap\BootstrapAdministratorService;
 use App\Authorization\Context\TrustedSessionContext;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Http\Request;
@@ -11,7 +12,8 @@ use RuntimeException;
 class TrustedSessionContextService
 {
     public function __construct(
-        private readonly ConnectionInterface $database
+        private readonly ConnectionInterface $database,
+        private readonly BootstrapAdministratorService $bootstrapAdministrators,
     ) {
     }
 
@@ -19,6 +21,58 @@ class TrustedSessionContextService
         int $authIdentityId,
         int $loginAttemptId
     ): TrustedSessionContext {
+        $this->validateIdentifiers(
+            $authIdentityId,
+            $loginAttemptId
+        );
+
+        $this->assertActiveIdentity(
+            $authIdentityId
+        );
+
+        $approvedContext =
+            $this->resolveApprovedContext(
+                $authIdentityId,
+                $loginAttemptId
+            );
+
+        if ($approvedContext !== null) {
+            return $approvedContext;
+        }
+
+        if (
+            !$this->bootstrapAdministrators
+                ->isBootstrapIdentity(
+                    $authIdentityId
+                )
+        ) {
+            throw new RuntimeException(
+                'An approved login context was not found.'
+            );
+        }
+
+        return $this->resolveBootstrapContext(
+            $authIdentityId
+        );
+    }
+
+    public function store(
+        Request $request,
+        TrustedSessionContext $context
+    ): void {
+        $session = $request->session();
+
+        $session->put(
+            $context->sessionValues()
+        );
+
+        $session->regenerate();
+    }
+
+    private function validateIdentifiers(
+        int $authIdentityId,
+        int $loginAttemptId
+    ): void {
         if ($authIdentityId < 1) {
             throw new InvalidArgumentException(
                 'authIdentityId must be positive.'
@@ -30,7 +84,11 @@ class TrustedSessionContextService
                 'loginAttemptId must be positive.'
             );
         }
+    }
 
+    private function assertActiveIdentity(
+        int $authIdentityId
+    ): void {
         $identityExists = $this->database
             ->table('auth_identities')
             ->where('id', $authIdentityId)
@@ -42,15 +100,26 @@ class TrustedSessionContextService
                 'The active IAM identity does not exist.'
             );
         }
+    }
 
+    private function resolveApprovedContext(
+        int $authIdentityId,
+        int $loginAttemptId
+    ): ?TrustedSessionContext {
         $approvalQuery = $this->database
             ->table('auth_pending_approvals')
-            ->where('auth_identity_id', $authIdentityId)
+            ->where(
+                'auth_identity_id',
+                $authIdentityId
+            )
             ->where('status', 'approved')
             ->whereNotNull('approved_bu_id');
 
         $approval = (clone $approvalQuery)
-            ->where('login_attempt_id', $loginAttemptId)
+            ->where(
+                'login_attempt_id',
+                $loginAttemptId
+            )
             ->orderByDesc('id')
             ->first([
                 'approved_bu_id',
@@ -58,8 +127,7 @@ class TrustedSessionContextService
 
         /*
          * Trusted-device logins do not create another supervisor
-         * approval. In that case, retain the identity's most recently
-         * approved business-unit context.
+         * approval. Retain the identity's latest approved context.
          */
         $approval ??= $approvalQuery
             ->orderByDesc('id')
@@ -68,12 +136,11 @@ class TrustedSessionContextService
             ]);
 
         if (!$approval) {
-            throw new RuntimeException(
-                'An approved login context was not found.'
-            );
+            return null;
         }
 
-        $sourceBusinessUnitId = (int) $approval->approved_bu_id;
+        $sourceBusinessUnitId =
+            (int) $approval->approved_bu_id;
 
         if ($sourceBusinessUnitId < 1) {
             throw new RuntimeException(
@@ -100,8 +167,8 @@ class TrustedSessionContextService
             );
         }
 
-        $businessUnitId = (int) $businessUnit->id;
-        $companyId = (int) $businessUnit->company_id;
+        $companyId =
+            (int) $businessUnit->company_id;
 
         $companyExists = $this->database
             ->table('access_companies')
@@ -111,11 +178,129 @@ class TrustedSessionContextService
 
         if (!$companyExists) {
             throw new RuntimeException(
-                'The IAM company for the approved business unit '
-                . 'is unavailable.'
+                'The IAM company for the approved '
+                . 'business unit is unavailable.'
             );
         }
 
+        $systemId = $this->iamSystemId();
+
+        return new TrustedSessionContext(
+            authIdentityId: $authIdentityId,
+            companyId: $companyId,
+            businessUnitId:
+                (int) $businessUnit->id,
+            systemId: $systemId,
+        );
+    }
+
+    private function resolveBootstrapContext(
+        int $authIdentityId
+    ): TrustedSessionContext {
+        $context = $this->database
+            ->table(
+                'access_identity_business_units '
+                . 'AS bu_membership'
+            )
+            ->join(
+                'access_business_units AS business_unit',
+                'business_unit.id',
+                '=',
+                'bu_membership.business_unit_id'
+            )
+            ->join(
+                'access_companies AS company',
+                'company.id',
+                '=',
+                'business_unit.company_id'
+            )
+            ->join(
+                'access_identity_companies '
+                . 'AS company_membership',
+                function ($join) use (
+                    $authIdentityId
+                ): void {
+                    $join
+                        ->on(
+                            'company_membership.company_id',
+                            '=',
+                            'company.id'
+                        )
+                        ->where(
+                            'company_membership.auth_identity_id',
+                            '=',
+                            $authIdentityId
+                        );
+                }
+            )
+            ->join(
+                'access_identity_systems '
+                . 'AS system_membership',
+                'system_membership.auth_identity_id',
+                '=',
+                'bu_membership.auth_identity_id'
+            )
+            ->join(
+                'access_systems AS system_catalog',
+                'system_catalog.id',
+                '=',
+                'system_membership.system_id'
+            )
+            ->where(
+                'bu_membership.auth_identity_id',
+                $authIdentityId
+            )
+            ->where(
+                'bu_membership.status',
+                'active'
+            )
+            ->where(
+                'company_membership.status',
+                'active'
+            )
+            ->where(
+                'system_membership.status',
+                'active'
+            )
+            ->where(
+                'business_unit.status',
+                'active'
+            )
+            ->where('company.status', 'active')
+            ->where(
+                'system_catalog.status',
+                'active'
+            )
+            ->orderBy('company.id')
+            ->orderBy('business_unit.id')
+            ->orderBy('system_catalog.id')
+            ->first([
+                'company.id AS company_id',
+                'business_unit.id '
+                    . 'AS business_unit_id',
+                'system_catalog.id AS system_id',
+            ]);
+
+        if (!$context) {
+            throw new RuntimeException(
+                'The bootstrap administrator has no '
+                . 'active IAM membership context.'
+            );
+        }
+
+        return new TrustedSessionContext(
+            authIdentityId: $authIdentityId,
+            companyId:
+                (int) $context->company_id,
+            businessUnitId:
+                (int) $context->business_unit_id,
+            systemId:
+                (int) $context->system_id,
+        );
+    }
+
+    private function iamSystemId(): int
+    {
         $systemId = $this->database
             ->table('access_systems')
             ->where('slug', 'iam')
@@ -128,26 +313,6 @@ class TrustedSessionContextService
             );
         }
 
-        $systemId = (int) $systemId;
-
-        return new TrustedSessionContext(
-            authIdentityId: $authIdentityId,
-            companyId: $companyId,
-            businessUnitId: $businessUnitId,
-            systemId: $systemId,
-        );
-    }
-
-    public function store(
-        Request $request,
-        TrustedSessionContext $context
-    ): void {
-        $session = $request->session();
-
-        $session->put(
-            $context->sessionValues()
-        );
-
-        $session->regenerate();
+        return (int) $systemId;
     }
 }

@@ -1,7 +1,4 @@
 <div
-    x-cloak
-    x-show="createModalOpen"
-    x-transition.opacity
     class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center p-3"
     style="
         z-index: 2100;

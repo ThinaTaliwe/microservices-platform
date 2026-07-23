@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Authorization;
 
+use App\Authorization\Bootstrap\BootstrapAdministratorService;
 use App\Authorization\Context\TrustedSessionContext;
 use App\Authorization\Resolver\TrustedSessionContextService;
 use Illuminate\Database\Capsule\Manager as Capsule;
@@ -11,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Session\ArraySessionHandler;
 use Illuminate\Session\Store;
 use InvalidArgumentException;
+use Mockery;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
@@ -19,6 +21,8 @@ class TrustedSessionContextServiceTest extends TestCase
     private Capsule $capsule;
 
     private ConnectionInterface $database;
+
+    private BootstrapAdministratorService $bootstrapAdministrators;
 
     protected function setUp(): void
     {
@@ -40,6 +44,22 @@ class TrustedSessionContextServiceTest extends TestCase
 
         $this->createSchema();
         $this->seedValidContext();
+
+        $this->bootstrapAdministrators = Mockery::mock(
+            BootstrapAdministratorService::class
+        );
+
+        $this->bootstrapAdministrators
+            ->shouldReceive('isBootstrapIdentity')
+            ->byDefault()
+            ->andReturn(false);
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+
+        parent::tearDown();
     }
 
     public function test_it_resolves_approved_context(): void
@@ -123,6 +143,31 @@ class TrustedSessionContextServiceTest extends TestCase
         );
     }
 
+    public function test_it_resolves_bootstrap_context_without_approval(): void
+    {
+        $this->database
+            ->table('auth_pending_approvals')
+            ->delete();
+
+        $this->seedBootstrapMemberships();
+
+        $this->bootstrapAdministrators
+            ->shouldReceive('isBootstrapIdentity')
+            ->once()
+            ->with(1)
+            ->andReturn(true);
+
+        $context = $this->service()->resolve(
+            authIdentityId: 1,
+            loginAttemptId: 10,
+        );
+
+        $this->assertSame(1, $context->authIdentityId);
+        $this->assertSame(2, $context->companyId);
+        $this->assertSame(3, $context->businessUnitId);
+        $this->assertSame(4, $context->systemId);
+    }
+
     public function test_it_rejects_missing_approval(): void
     {
         $this->database
@@ -194,7 +239,9 @@ class TrustedSessionContextServiceTest extends TestCase
     private function service(): TrustedSessionContextService
     {
         return new TrustedSessionContextService(
-            $this->database
+            database: $this->database,
+            bootstrapAdministrators:
+                $this->bootstrapAdministrators,
         );
     }
 
@@ -254,6 +301,36 @@ class TrustedSessionContextServiceTest extends TestCase
                 $table->string('status');
             }
         );
+
+        foreach ([
+            [
+                'access_identity_companies',
+                'company_id',
+            ],
+            [
+                'access_identity_business_units',
+                'business_unit_id',
+            ],
+            [
+                'access_identity_systems',
+                'system_id',
+            ],
+        ] as [$tableName, $scopeColumn]) {
+            $schema->create(
+                $tableName,
+                function (Blueprint $table) use (
+                    $scopeColumn
+                ): void {
+                    $table->unsignedBigInteger(
+                        'auth_identity_id'
+                    );
+                    $table->unsignedBigInteger(
+                        $scopeColumn
+                    );
+                    $table->string('status');
+                }
+            );
+        }
 
         $schema->create(
             'access_role_contexts',
@@ -336,6 +413,35 @@ class TrustedSessionContextServiceTest extends TestCase
                 'status' => 'active',
                 'valid_from' => null,
                 'valid_until' => null,
+            ]);
+    }
+
+    private function seedBootstrapMemberships(): void
+    {
+        $this->database
+            ->table('access_identity_companies')
+            ->insert([
+                'auth_identity_id' => 1,
+                'company_id' => 2,
+                'status' => 'active',
+            ]);
+
+        $this->database
+            ->table(
+                'access_identity_business_units'
+            )
+            ->insert([
+                'auth_identity_id' => 1,
+                'business_unit_id' => 3,
+                'status' => 'active',
+            ]);
+
+        $this->database
+            ->table('access_identity_systems')
+            ->insert([
+                'auth_identity_id' => 1,
+                'system_id' => 4,
+                'status' => 'active',
             ]);
     }
 
