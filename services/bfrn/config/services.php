@@ -47,4 +47,12 @@ return [
         'api_key' => env('GOOGLE_MAPS_API_KEY'),
     ],
 
+
+    'iam_platform' => [
+        'administration_url' => env(
+            'IAM_ADMINISTRATION_URL',
+            'http://192.168.1.9:8192/iam-v2/administration/role-assignments'
+        ),
+    ],
+
 ];

@@ -228,6 +228,9 @@
             $canViewShipments = \App\Support\BfrnPermission::can('ship', 'read');
             $canViewApiHealth = \App\Support\BfrnPermission::can('apihealth', 'read');
             $canViewUserAdmin = \App\Support\BfrnPermission::can('useradmin', 'read');
+            $iamAdministrationUrl = config(
+                'services.iam_platform.administration_url'
+            );
         @endphp
         <div class="ops-sidebar-toggle-wrap">
             <button type="button" class="ops-toggle" @click="toggleSidebar()" title="Toggle sidebar">
@@ -305,6 +308,25 @@
                 <i class="bi bi-journal-text"></i>
                 <span class="ops-nav-label">Audit Log</span>
             </a>
+
+        @if($canViewUserAdmin && filled($iamAdministrationUrl))
+            <div class="ops-nav-section mt-3">
+                Platform
+            </div>
+
+            <a
+                href="{{ $iamAdministrationUrl }}"
+                class="ops-nav-link"
+                title="IAM Administration"
+            >
+                <i class="bi bi-shield-lock"></i>
+
+                <span class="ops-nav-label">
+                    IAM Administration
+                </span>
+            </a>
+        @endif
+
 
         @endif
 
@@ -1780,6 +1802,11 @@ window.bfrnFillAddressFormFromGooglePlace = function (place) {
     setValue('province', component('administrative_area_level_1'));
     setValue('country', component('country'));
     setValue('zip', component('postal_code'));
+
+    if (place.geometry && place.geometry.location) {
+        setValue('latitude', Number(place.geometry.location.lat()).toFixed(7));
+        setValue('longitude', Number(place.geometry.location.lng()).toFixed(7));
+    }
 };
 
 window.bfrnSetupGoogleAddressSearch = function () {
@@ -1791,7 +1818,7 @@ window.bfrnSetupGoogleAddressSearch = function () {
     input.dataset.googleReady = '1';
 
     const autocomplete = new google.maps.places.Autocomplete(input, {
-        fields: ['name', 'formatted_address', 'address_components'],
+        fields: ['name', 'formatted_address', 'address_components', 'geometry'],
         types: ['geocode'],
           });
 
