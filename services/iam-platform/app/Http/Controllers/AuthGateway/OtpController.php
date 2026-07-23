@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\AuthGateway;
 
+use App\Authorization\Resolver\TrustedSessionContextService;
 use App\Http\Controllers\Controller;
 use App\Services\Otp\OtpChallengeService;
 use Carbon\CarbonImmutable;
@@ -12,7 +13,8 @@ use Illuminate\View\View;
 class OtpController extends Controller
 {
     public function __construct(
-        private readonly OtpChallengeService $otpChallenges
+        private readonly OtpChallengeService $otpChallenges,
+        private readonly TrustedSessionContextService $trustedContext,
     ) {
     }
 
@@ -59,6 +61,16 @@ class OtpController extends Controller
                     'code' => 'The code is invalid, expired, or locked.',
                 ]);
         }
+
+        $context = $this->trustedContext->resolve(
+            authIdentityId: (int) $verified->auth_identity_id,
+            loginAttemptId: (int) $verified->login_attempt_id,
+        );
+
+        $this->trustedContext->store(
+            $request,
+            $context
+        );
 
         $cookieMinutes = max(
             1,

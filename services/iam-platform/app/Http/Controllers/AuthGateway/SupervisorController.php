@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\AuthGateway;
 
+use App\Authorization\Membership\ApprovedContextMembershipProvisioner;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
@@ -10,14 +11,13 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\BfrnUserCreatedMail;
 use App\Services\Bfrn\BfrnApiClient;
-use App\Services\Otp\OtpChallengeService;
 use Illuminate\Support\Str;
 
 class SupervisorController extends Controller
 {
     public function __construct(
         private readonly BfrnApiClient $bfrnApiClient,
-        private readonly OtpChallengeService $otpChallenges
+        private readonly ApprovedContextMembershipProvisioner $membershipProvisioner,
     ) {
     }
 
@@ -125,9 +125,8 @@ class SupervisorController extends Controller
         }
 
         $mailPayload = null;
-        $otpPayload = null;
 
-        DB::transaction(function () use ($approval, $id, $status, $reason, $approvedBuId, &$mailPayload, &$otpPayload) {
+        DB::transaction(function () use ($approval, $id, $status, $reason, $approvedBuId, &$mailPayload) {
             DB::table('auth_pending_approvals')
                 ->where('id', $id)
                 ->update([
@@ -194,6 +193,11 @@ class SupervisorController extends Controller
                                 'updated_at' => now(),
                             ]);
 
+                        $this->membershipProvisioner->provision(
+                            authIdentityId: (int) $identity->id,
+                            sourceBusinessUnitId: $defaultBuId,
+                        );
+
                         $mailPayload = [
                             'identity_id' => $identity->id,
                             'login_attempt_id' => $approval->login_attempt_id,
@@ -202,11 +206,6 @@ class SupervisorController extends Controller
                             'bfrn_user_id' => $identity->bfrn_user_id,
                         ];
 
-                        $otpPayload = [
-                            'identity_id' => (int) $identity->id,
-                            'login_attempt_id' => (int) $approval->login_attempt_id,
-                            'email' => $email,
-                        ];
                     }
                 }
             }
@@ -219,7 +218,10 @@ class SupervisorController extends Controller
                     'approval_id' => $id,
                     'status' => $status,
                     'reason' => $reason,
-                    'otp_required' => $status === 'approved',
+                    'otp_required' => false,
+                    'next_step' => $status === 'approved'
+                        ? 'login_again'
+                        : null,
                     'handoff_created' => false,
                     'decided_at' => now()->toDateTimeString(),
                 ])),
@@ -227,14 +229,6 @@ class SupervisorController extends Controller
                 'updated_at' => now(),
             ]);
         });
-
-        if ($otpPayload) {
-            $this->otpChallenges->issue(
-                $otpPayload['identity_id'],
-                $otpPayload['login_attempt_id'],
-                $otpPayload['email']
-            );
-        }
 
         if ($mailPayload) {
             try {
