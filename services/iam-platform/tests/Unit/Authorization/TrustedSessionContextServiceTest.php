@@ -174,21 +174,21 @@ class TrustedSessionContextServiceTest extends TestCase
         $this->service()->resolve(1, 10);
     }
 
-    public function test_it_rejects_missing_role_assignment(): void
+    public function test_it_resolves_context_without_a_role_assignment(): void
     {
         $this->database
             ->table('access_role_contexts')
             ->delete();
 
-        $this->expectException(
-            RuntimeException::class
+        $context = $this->service()->resolve(
+            authIdentityId: 1,
+            loginAttemptId: 10,
         );
 
-        $this->expectExceptionMessage(
-            'The IAM identity has no active role assignment'
-        );
-
-        $this->service()->resolve(1, 10);
+        $this->assertSame(1, $context->authIdentityId);
+        $this->assertSame(2, $context->companyId);
+        $this->assertSame(3, $context->businessUnitId);
+        $this->assertSame(4, $context->systemId);
     }
 
     private function service(): TrustedSessionContextService

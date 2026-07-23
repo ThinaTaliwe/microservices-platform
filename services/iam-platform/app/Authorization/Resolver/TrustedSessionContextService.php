@@ -130,49 +130,6 @@ class TrustedSessionContextService
 
         $systemId = (int) $systemId;
 
-        $now = now();
-
-        $hasApplicableRole = $this->database
-            ->table('access_role_contexts')
-            ->where('auth_identity_id', $authIdentityId)
-            ->where('status', 'active')
-            ->where(function ($query) use ($companyId): void {
-                $query
-                    ->whereNull('company_id')
-                    ->orWhere('company_id', $companyId);
-            })
-            ->where(function ($query) use ($businessUnitId): void {
-                $query
-                    ->whereNull('business_unit_id')
-                    ->orWhere(
-                        'business_unit_id',
-                        $businessUnitId
-                    );
-            })
-            ->where(function ($query) use ($systemId): void {
-                $query
-                    ->whereNull('system_id')
-                    ->orWhere('system_id', $systemId);
-            })
-            ->where(function ($query) use ($now): void {
-                $query
-                    ->whereNull('valid_from')
-                    ->orWhere('valid_from', '<=', $now);
-            })
-            ->where(function ($query) use ($now): void {
-                $query
-                    ->whereNull('valid_until')
-                    ->orWhere('valid_until', '>=', $now);
-            })
-            ->exists();
-
-        if (!$hasApplicableRole) {
-            throw new RuntimeException(
-                'The IAM identity has no active role assignment '
-                . 'for the approved context.'
-            );
-        }
-
         return new TrustedSessionContext(
             authIdentityId: $authIdentityId,
             companyId: $companyId,
