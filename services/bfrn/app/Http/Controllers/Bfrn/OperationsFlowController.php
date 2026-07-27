@@ -205,8 +205,9 @@ class OperationsFlowController extends Controller
             'mode_of_transport_id' => ['required', 'integer'],
             'name' => ['required', 'string', 'max:45'],
             'description' => ['nullable', 'string', 'max:255'],
-            'item_id' => ['nullable', 'integer'],
-            'quantity' => ['nullable', 'numeric', 'min:0.000001'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.item_id' => ['required', 'integer', 'distinct'],
+            'items.*.quantity' => ['required', 'numeric', 'min:0.000001'],
             'from_address_id' => ['nullable', 'integer'],
             'to_address_id' => ['nullable', 'integer'],
         ]);
@@ -247,6 +248,12 @@ class OperationsFlowController extends Controller
             'bu_id' => ['required', 'integer'],
             'shipment_type_id' => ['required', 'integer'],
             'mode_of_transport_id' => ['required', 'integer'],
+
+            'items' => ['required', 'array', 'min:1'],
+
+            'items.*.item_id' => ['required', 'integer', 'distinct'],
+
+            'items.*.quantity' => ['required', 'numeric', 'min:0.000001'],
             'name' => ['required', 'string', 'max:45'],
             'description' => ['nullable', 'string', 'max:255'],
             'from_address_id' => ['nullable', 'integer'],

@@ -355,6 +355,7 @@
             valueField: config.valueField || 'id',
             labelField: config.labelField || 'name',
             placeholder: config.placeholder || 'Search and select...',
+            selectedOption: config.selectedOption || null,
             options: [],
 
             csrfToken() {
@@ -384,6 +385,15 @@
                     }
 
                     this.options = data.results || data || [];
+                    if (this.selectedOption && !this.selectedValue) {
+                        const option = this.options.find(o =>
+                            String(o[this.valueField]) === String(this.selectedOption[this.valueField])
+                        );
+
+                        if (option) {
+                            this.selectOption(option);
+                        }
+                    }
                 } catch (error) {
                     this.error = error.message || 'Unable to load options.';
                     this.options = [];
@@ -427,10 +437,38 @@
             search: '',
             statusFilter: '',
             modalOpen: false,
+
+            createItems: [
+                {
+                    key: `create-item-${Date.now()}-0`,
+                    quantity: '1.000000',
+                },
+            ],
+
+            addCreateItem() {
+                this.createItems.push({
+                    key: `create-item-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                    quantity: '1.000000',
+                });
+            },
+
+            removeCreateItem(index) {
+                if (this.createItems.length <= 1) {
+                    return;
+                }
+
+                this.createItems.splice(index, 1);
+            },
             creatingFlow: false,
             createError: '',
             createSuccess: '',
             selected: null,
+            selectedCargo: [],
+            cargoLoading: false,
+            cargoError: '',
+            itemOptions: [],
+            itemNameMap: {},
+            editItems: [],
             loadingDetails: false,
             detailError: null,
             parentStack: [],
@@ -485,6 +523,124 @@
             },
 
 
+
+            async loadItemOptions() {
+                if (this.itemOptions.length > 0) {
+                    return this.itemOptions;
+                }
+
+                const response = await fetch('/bfrn/api/lookups/items', {
+                    headers: { 'Accept': 'application/json' }
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(
+                        data.message || data.detail || 'Unable to load item options.'
+                    );
+                }
+
+                this.itemOptions = data.results || data || [];
+
+                this.itemNameMap = this.itemOptions.reduce((map, item) => {
+                    map[item.id] =
+                        item.label ||
+                        item.name ||
+                        item.description ||
+                        ('Item #' + item.id);
+
+                    return map;
+                }, {});
+
+                return this.itemOptions;
+            },
+
+            itemLabel(id) {
+                return id
+                    ? (this.itemNameMap[id] || ('Item #' + id))
+                    : 'Unknown item';
+            },
+
+            formatQuantity(value) {
+                if (value === null || value === undefined || value === '') {
+                    return '0';
+                }
+
+                const quantity = Number(value);
+
+                if (!Number.isFinite(quantity)) {
+                    return String(value);
+                }
+
+                return quantity.toLocaleString('en-US', {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 6,
+                    useGrouping: true
+                });
+            },
+
+            async loadShipmentCargo(shipmentId) {
+                this.cargoLoading = true;
+                this.cargoError = '';
+
+                try {
+                    await this.loadItemOptions();
+
+                    const response = await fetch(
+                        `/bfrn/api/shipments/shipment-items?shipment=${encodeURIComponent(shipmentId)}`,
+                        { headers: { 'Accept': 'application/json' } }
+                    );
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(
+                            data.message || data.detail || 'Unable to load shipment cargo.'
+                        );
+                    }
+
+                    const rows = data.results || data || [];
+
+                    this.selectedCargo = rows
+                        .filter(row =>
+                            Number(row.shipment) === Number(shipmentId)
+                        )
+                        .map(row => ({
+                            id: row.id,
+                            item_id: row.item,
+                            item_label: this.itemLabel(row.item),
+                            quantity: row.quantity
+                        }));
+
+                    return this.selectedCargo;
+                } catch (error) {
+                    this.selectedCargo = [];
+                    this.cargoError =
+                        error.message || 'Unable to load shipment cargo.';
+
+                    return [];
+                } finally {
+                    this.cargoLoading = false;
+                }
+            },
+
+            addEditItem() {
+                this.editItems.push({
+                    key: `edit-item-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                    item_id: '',
+                    item_label: '',
+                    quantity: '1.000000'
+                });
+            },
+
+            removeEditItem(index) {
+                if (this.editItems.length <= 1) {
+                    return;
+                }
+
+                this.editItems.splice(index, 1);
+            },
 
             async loadEditLookupNames() {
                 if (
@@ -567,6 +723,7 @@
                         } catch (e) {}
                     }
 
+                    data.shipment_items = await this.loadShipmentCargo(data.id);
                     await this.loadAddressNameMap();
                     await this.loadEditLookupNames();
                     this.openEditFlow(data);
@@ -590,6 +747,24 @@
                     from_address_id: shipment.from_address || '',
                     to_address_id: shipment.to_address || ''
                 };
+                const cargo = shipment.shipment_items || this.selectedCargo || [];
+
+                this.editItems = cargo.length > 0
+                    ? cargo.map((row, index) => ({
+                        key: `edit-item-${shipment.id}-${row.id || index}`,
+                        item_id: row.item_id || row.item || '',
+                        item_label:
+                            row.item_label ||
+                            this.itemLabel(row.item_id || row.item),
+                        quantity: row.quantity || '1.000000'
+                    }))
+                    : [{
+                        key: `edit-item-${shipment.id}-0`,
+                        item_id: '',
+                        item_label: '',
+                        quantity: '1.000000'
+                    }];
+
                 this.editModalOpen = true;
             },
 
@@ -1738,6 +1913,7 @@
                         } catch (e) {}
                     }
 
+                    data.shipment_items = await this.loadShipmentCargo(data.id);
                     this.selected = data;
                     await this.loadAddressNameMap();
                     await this.loadDocuments(data.id);

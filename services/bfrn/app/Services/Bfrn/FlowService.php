@@ -107,8 +107,20 @@ class FlowService
         $buId = $this->activeBuId();
         $shipmentTypeId = (int) $data['shipment_type_id'];
         $modeOfTransportId = (int) $data['mode_of_transport_id'];
-        $itemId = (int) ($data['item_id'] ?? 1);
-        $quantity = $data['quantity'] ?? '1.000000';
+        $items = $data['items'] ?? [
+            [
+                'item_id' => $data['item_id'] ?? 1,
+                'quantity' => $data['quantity'] ?? '1.000000',
+            ],
+        ];
+
+        $items = array_values(array_map(
+            static fn (array $item): array => [
+                'item' => (int) $item['item_id'],
+                'quantity' => $item['quantity'],
+            ],
+            $items
+        ));
 
         $name = trim($data['name']);
         $description = trim($data['description'] ?? '');
@@ -135,11 +147,15 @@ class FlowService
 
         $instruction = $this->post('/api/shipments/shipment-instructions/', $instructionPayload);
 
-        $this->post('/api/shipments/shipment-instruction-items/', [
-            'shipment_instruction' => $instruction['id'],
-            'item' => $itemId,
-            'quantity' => $quantity,
-        ]);
+        $instructionItems = [];
+
+        foreach ($items as $item) {
+            $instructionItems[] = $this->post('/api/shipments/shipment-instruction-items/', [
+                'shipment_instruction' => $instruction['id'],
+                'item' => $item['item'],
+                'quantity' => $item['quantity'],
+            ]);
+        }
 
         $loading = $this->post('/api/loading/loadings/', [
             'bu' => $buId,
@@ -148,12 +164,7 @@ class FlowService
             'loading_start_time' => $timestamp,
             'created_at' => $timestamp,
             'updated_at' => $timestamp,
-            'items' => [
-                [
-                    'item' => $itemId,
-                    'quantity' => $quantity,
-                ],
-            ],
+            'items' => $items,
         ]);
 
         $movement = $this->post('/api/movement/movements/', [
@@ -165,11 +176,15 @@ class FlowService
             'updated_at' => $timestamp,
         ]);
 
-        $this->post('/api/movement/movement-items/', [
-            'movement' => $movement['id'],
-            'item' => $itemId,
-            'quantity' => $quantity,
-        ]);
+        $movementItems = [];
+
+        foreach ($items as $item) {
+            $movementItems[] = $this->post('/api/movement/movement-items/', [
+                'movement' => $movement['id'],
+                'item' => $item['item'],
+                'quantity' => $item['quantity'],
+            ]);
+        }
 
         $offloading = $this->post('/api/movement/offloadings/', [
             'bu' => $buId,
@@ -180,11 +195,15 @@ class FlowService
             'updated_at' => $timestamp,
         ]);
 
-        $this->post('/api/movement/offloading-items/', [
-            'offloading' => $offloading['id'],
-            'item' => $itemId,
-            'quantity' => $quantity,
-        ]);
+        $offloadingItems = [];
+
+        foreach ($items as $item) {
+            $offloadingItems[] = $this->post('/api/movement/offloading-items/', [
+                'offloading' => $offloading['id'],
+                'item' => $item['item'],
+                'quantity' => $item['quantity'],
+            ]);
+        }
 
         $storage = $this->post('/api/storage/storage/', [
             'bu' => $buId,
@@ -196,11 +215,15 @@ class FlowService
             'storage_refence' => $reference . '-STORAGE',
         ]);
 
-        $this->post('/api/storage/storage-items/', [
-            'storage' => $storage['id'],
-            'item' => $itemId,
-            'quantity' => $quantity,
-        ]);
+        $storageItems = [];
+
+        foreach ($items as $item) {
+            $storageItems[] = $this->post('/api/storage/storage-items/', [
+                'storage' => $storage['id'],
+                'item' => $item['item'],
+                'quantity' => $item['quantity'],
+            ]);
+        }
 
         $shipment = $this->post('/api/shipments/shipments/', [
             'shipment_type' => $shipmentTypeId,
@@ -217,11 +240,15 @@ class FlowService
             'updated_at' => $timestamp,
         ]);
 
-        $shipmentItem = $this->post('/api/shipments/shipment-items/', [
-            'shipment' => $shipment['id'],
-            'item' => $itemId,
-            'quantity' => $quantity,
-        ]);
+        $shipmentItems = [];
+
+        foreach ($items as $item) {
+            $shipmentItems[] = $this->post('/api/shipments/shipment-items/', [
+                'shipment' => $shipment['id'],
+                'item' => $item['item'],
+                'quantity' => $item['quantity'],
+            ]);
+        }
 
         return [
             'reference' => $reference,
@@ -231,8 +258,180 @@ class FlowService
             'offloading' => $offloading,
             'storage' => $storage,
             'shipment' => $shipment,
-            'shipment_item' => $shipmentItem,
+            'instruction_items' => $instructionItems,
+            'movement_items' => $movementItems,
+            'offloading_items' => $offloadingItems,
+            'storage_items' => $storageItems,
+            'shipment_items' => $shipmentItems,
+            'shipment_item' => $shipmentItems[0] ?? null,
         ];
+    }
+
+
+    /**
+     * Synchronize one operational item collection using a minimal diff.
+     *
+     * Existing records are preserved where possible. Only changed quantities
+     * are patched, new items are created, and removed items are deleted.
+     */
+    private function synchronizeOperationalItems(
+        string $endpoint,
+        string $parentField,
+        int $parentId,
+        array $submittedItems
+    ): array {
+        if ($parentId <= 0) {
+            return [];
+        }
+
+        $payload = $this->get($endpoint);
+        $existingRows = $payload['results'] ?? $payload ?? [];
+
+        $existingByItemId = [];
+
+        foreach ($existingRows as $existingRow) {
+            if (
+                !is_array($existingRow)
+                || (int) ($existingRow[$parentField] ?? 0) !== $parentId
+                || empty($existingRow['id'])
+                || empty($existingRow['item'])
+            ) {
+                continue;
+            }
+
+            $itemId = (int) $existingRow['item'];
+
+            /*
+             * Duplicate rows should not normally exist. When they do, retain
+             * the first record as canonical and delete the duplicates.
+             */
+            if (isset($existingByItemId[$itemId])) {
+                $this->delete(
+                    rtrim($endpoint, '/') . '/' . (int) $existingRow['id'] . '/'
+                );
+
+                continue;
+            }
+
+            $existingByItemId[$itemId] = $existingRow;
+        }
+
+        $synchronizedRows = [];
+        $submittedItemIds = [];
+
+        foreach ($submittedItems as $submittedItem) {
+            $itemId = (int) $submittedItem['item'];
+            $quantity = $submittedItem['quantity'];
+
+            $submittedItemIds[$itemId] = true;
+
+            if (!isset($existingByItemId[$itemId])) {
+                $synchronizedRows[] = $this->post($endpoint, [
+                    $parentField => $parentId,
+                    'item' => $itemId,
+                    'quantity' => $quantity,
+                ]);
+
+                continue;
+            }
+
+            $existingRow = $existingByItemId[$itemId];
+
+            $existingQuantity = number_format(
+                (float) ($existingRow['quantity'] ?? 0),
+                6,
+                '.',
+                ''
+            );
+
+            $submittedQuantity = number_format(
+                (float) $quantity,
+                6,
+                '.',
+                ''
+            );
+
+            if ($existingQuantity !== $submittedQuantity) {
+                $existingRow = $this->patch(
+                    rtrim($endpoint, '/') . '/' . (int) $existingRow['id'] . '/',
+                    [
+                        $parentField => $parentId,
+                        'item' => $itemId,
+                        'quantity' => $quantity,
+                    ]
+                );
+            }
+
+            $synchronizedRows[] = $existingRow;
+        }
+
+        foreach ($existingByItemId as $itemId => $existingRow) {
+            if (isset($submittedItemIds[$itemId])) {
+                continue;
+            }
+
+            $this->delete(
+                rtrim($endpoint, '/') . '/' . (int) $existingRow['id'] . '/'
+            );
+        }
+
+        return $synchronizedRows;
+    }
+
+    /**
+     * Keep shipment, instruction, loading, movement, offloading and storage
+     * item collections synchronized.
+     */
+    private function synchronizeShipmentCargo(array $shipment, array $submittedItems): array
+    {
+        $items = array_values(array_map(
+            static fn (array $item): array => [
+                'item' => (int) $item['item_id'],
+                'quantity' => $item['quantity'],
+            ],
+            $submittedItems
+        ));
+
+        $collections = [
+            'instruction_items' => $this->synchronizeOperationalItems(
+                '/api/shipments/shipment-instruction-items/',
+                'shipment_instruction',
+                (int) ($shipment['shipment_instruction'] ?? 0),
+                $items
+            ),
+            'loading_items' => $this->synchronizeOperationalItems(
+                '/api/loading/loading-items/',
+                'loading',
+                (int) ($shipment['loading'] ?? 0),
+                $items
+            ),
+            'movement_items' => $this->synchronizeOperationalItems(
+                '/api/movement/movement-items/',
+                'movement',
+                (int) ($shipment['movement'] ?? 0),
+                $items
+            ),
+            'offloading_items' => $this->synchronizeOperationalItems(
+                '/api/movement/offloading-items/',
+                'offloading',
+                (int) ($shipment['offloading'] ?? 0),
+                $items
+            ),
+            'storage_items' => $this->synchronizeOperationalItems(
+                '/api/storage/storage-items/',
+                'storage',
+                (int) ($shipment['storage'] ?? 0),
+                $items
+            ),
+            'shipment_items' => $this->synchronizeOperationalItems(
+                '/api/shipments/shipment-items/',
+                'shipment',
+                (int) ($shipment['id'] ?? 0),
+                $items
+            ),
+        ];
+
+        return $collections;
     }
 
     public function updateShipment(int $shipmentId, array $data): array
@@ -270,6 +469,14 @@ class FlowService
                 $this->patch("/api/shipments/shipment-instructions/{$instructionId}/", $instructionPayload);
             }
         }
+
+        $cargoCollections = $this->synchronizeShipmentCargo(
+            $shipment,
+            $data['items']
+        );
+
+        $shipment['shipment_items'] = $cargoCollections['shipment_items'];
+        $shipment['cargo_collections'] = $cargoCollections;
 
         return $shipment;
     }
