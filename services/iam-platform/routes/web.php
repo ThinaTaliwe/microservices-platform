@@ -8,6 +8,7 @@ use App\Http\Middleware\EnsureContextPermission;
 use App\Http\Controllers\AuthGateway\LoginController;
 use App\Http\Controllers\AuthGateway\OtpController;
 use App\Http\Controllers\AuthGateway\SupervisorController;
+use App\Http\Controllers\ApiTest\VerificationApiTestController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [LoginController::class, 'show'])->name('login.show');
@@ -90,3 +91,43 @@ Route::get(
         . ':iam.context.manage,iam-contexts'
     )
     ->name('iam-v2.role-assignments.catalogue');
+
+if (app()->environment('local')) {
+    Route::prefix('/api-test/verification')
+        ->name('api-test.verification.')
+        ->middleware('throttle:30,1')
+        ->group(function (): void {
+            Route::view('/', 'api-test.verification')
+                ->name('page');
+
+            Route::post(
+                '/generate',
+                [VerificationApiTestController::class, 'generate']
+            )->name('generate');
+
+            Route::get(
+                '/{challengeUuid}',
+                [VerificationApiTestController::class, 'show']
+            )->whereUuid('challengeUuid')->name('show');
+
+            Route::post(
+                '/{challengeUuid}/verify-otp',
+                [VerificationApiTestController::class, 'verifyOtp']
+            )->whereUuid('challengeUuid')->name('verify-otp');
+
+            Route::post(
+                '/{challengeUuid}/verify-token',
+                [VerificationApiTestController::class, 'verifyToken']
+            )->whereUuid('challengeUuid')->name('verify-token');
+
+            Route::post(
+                '/{challengeUuid}/resend',
+                [VerificationApiTestController::class, 'resend']
+            )->whereUuid('challengeUuid')->name('resend');
+
+            Route::delete(
+                '/{challengeUuid}',
+                [VerificationApiTestController::class, 'revoke']
+            )->whereUuid('challengeUuid')->name('revoke');
+        });
+}

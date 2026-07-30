@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'iam_internal' => [
+        'shared_secret' => env('IAM_PLATFORM_SHARED_SECRET'),
+    ],
+
+
 ];
